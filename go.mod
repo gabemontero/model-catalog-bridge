@@ -12,7 +12,6 @@ require (
 	github.com/openshift/api v0.0.0-20250102185430-d6d8306a24ec
 	github.com/openshift/client-go v0.0.0-20241217083110-35abaf51555b
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.31.4
 	k8s.io/apiextensions-apiserver v0.31.0
 	k8s.io/apimachinery v0.31.4
@@ -20,7 +19,6 @@ require (
 	k8s.io/client-go v0.31.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubectl v0.31.4
-	knative.dev/pkg v0.0.0-20241223131119-4c901591eb4a
 	sigs.k8s.io/controller-runtime v0.19.3
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -105,6 +103,7 @@ require (
 	github.com/prometheus/common v0.57.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -144,6 +143,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 // indirect
 	knative.dev/networking v0.0.0-20240815142417-37fdbdd0854b // indirect
+	knative.dev/pkg v0.0.0-20241223131119-4c901591eb4a // indirect
 	knative.dev/serving v0.42.2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
