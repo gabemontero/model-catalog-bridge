@@ -1,6 +1,14 @@
-# Backstage AI related administration CLI - bac
+# RHDH Model Catalog Bridge
 
-A CLI that facilitates injecting AI model metadata from various sources into the Backstage Catalog
+This repository provides various containers that faciiltate theseamless export of AI model records from various AI Model Registres and imports them into Red Hat Developer Hub (Backstage) as catalog entities.
+
+Current status: early POC stage.  
+- We have some docker files in place for the container imaages, but more work is needed there
+- This repository collaborates with Backstage catalog entensions currently hosted in [our fork of the RHDH plugins repository](https://github.com/redhat-ai-dev/rhdh-plugins/tree/main/workspaces/rhdh-ai).
+- Until those plugins have assoicated images and can be added to OCP RHDH, we have to run those plugins, and by extension backstage, from our laptops.
+- By extension, the `rhoai-normalizer` and `storage-reset` containers have to run on one's laptop as well.  The `location` container can run as an OCP deployment, but it is just as easy to run it out of your laptop as well.
+- This [simple Gitops repo](https://github.com/redhat-ai-dev/odh-kubeflow-model-registry-setup) has the means of setting up Open Data Hub plus dev patches for Kubelow Model Registry that facilitate getting the URLs for running Model in RHOAI/ODH.
+
 
 ## Contributing
 
@@ -17,31 +25,24 @@ See [the development guide](docs/DEVELOPMENT.md) for details on how to build and
 
 ## Usage
 
-At a high level, the `bac` CLI
+Either via the command line, or from your favorite Golang editor, set the following environment variables as follows
 
-- Provides for the generation of YAML formatted definitions of Backstage `Components`, `Resources`, and `APIs` catalog entities by accessing external systems that provide AI model metadata.
-- Which external systems are supported is expected to grow over time, at least in the short term.
-- Once that YAML information is stored in a HTTP accessible file, the `bac` CLI then provides commands to instruct a specific Backstage instance to import those entities into its catalog.  This will show up as a Backstage `Location` in the catalog, where the `Location` is a parent of the `Components`, `Resources` and `APIs`.
-- Those `Components`, `Resources`, and `APIs` will have specific AI related `types` which will allow for distinguishing from other `Components`, `Resources` and `APIs` in the catalog.
-- It allows for the deletion of Backstage `Locations` and any `Components`, `Resources`, and `APIs` defined by that `Location`.
-- Lastly, the `bac` CLI allows for retrieving any AI related `Components`, `Resources` and `APIs`.
+### rhoai-normalizer
 
-To receive detailed usage information and example invocations, after building the `bac` executable, you can run
-```shell
-bac help
-```
+1. `K8S_TOKEN` - the login/bearer token of your `kubeadmin` user for the OCP cluster you are testing on
+2. `KUBECONFIG` - the path to the local kubeconfig file corresponding to your OCP cluster
+3. `MR_ROUTE` - the output from the command `echo "https://$(oc get routes -n istio-system -l app.kubernetes.io/name=modelregistry-public -o json | jq '.items[].status.ingress[].host | select(contains("-rest"))')" | tr -d '"`
+4. `NAMESPACE` - the name of the namespace you create for deploying AI models from ODH
+5. `STORAGE_URL` - for now, just use `http://localhost:7070`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
 
-This invocation will also provide the current list of subcommands.  Similarly, running 
-```shell
-bac help <subcommand>
-bac help <subcommand> <subcommand>
-```
-will provide usage information, example invocations, optional flags, and additional subcommands for the current list of subcommands.
+### storage-rest
 
-## Potential tl;dr
+1. `RHDH_TOKEN` - the static token you create in backstage to allows for authenticated access to the Backstage catalog API.  See (https://github.com/redhat-ai-dev/rhdh-plugins/blob/main/workspaces/rhdh-ai/app-config.yaml#L19)[https://github.com/redhat-ai-dev/rhdh-plugins/blob/main/workspaces/rhdh-ai/app-config.yaml#L19]
+2. `BKSTG_TOKEN` - for now, just use `http://localhost:7007`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
+3. `BRIDGE_URL` - for now, just use `http://locahost:9090`; this is the REST endpoint of our `location` container
+4. `STORAGE_TYPE` - for now, only the development mode `ConfigMap` is supported; we'll add `GitHub` soon
+5. `K8S_TOKEN`, `KUBECONFIG`, and `NAMESPACE` are the same as above
 
-First, our [background document](docs/background.md) gets into the scenarios and personas we are targeting with this CLI,
-as well as rationale for the syntax, language(s), and the like.
+### location
 
-Then, our [roadmap document](docs/roadmap.md) provides a snapshot of the more immediate changes we have planned, with 
-Jira references when ideas reach sufficient priority to warrant official tracking.
+1. `KUBECONFIG` and `NAMESPACE` are only needed
