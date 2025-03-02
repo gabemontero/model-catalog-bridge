@@ -367,7 +367,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 // fine grained on what we attempt to relist vs. just increasing the frequency of all the controller's watches
 
 func (r *RHOAINormalizerReconcile) Start(ctx context.Context) error {
-	eventTicker := time.NewTicker(2 * time.Second) //Minute)
+	eventTicker := time.NewTicker(2 * time.Minute)
 	for {
 		select {
 		case <-eventTicker.C:
