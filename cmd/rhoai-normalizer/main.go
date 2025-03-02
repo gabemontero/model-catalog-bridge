@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	rhoai_normalizer "github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/cmd/server/rhoai-normalizer"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/rhoai-normalizer"
 
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"

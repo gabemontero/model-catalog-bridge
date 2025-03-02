@@ -1,7 +1,7 @@
 package backstage
 
 import (
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"io"
 	"k8s.io/klog/v2"
 	"strings"

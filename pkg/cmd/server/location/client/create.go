@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

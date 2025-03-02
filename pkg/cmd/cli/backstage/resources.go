@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/rest"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 )
 
 type listResources struct {

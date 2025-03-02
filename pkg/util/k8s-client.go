@@ -9,7 +9,7 @@ import (
 	servingset "github.com/kserve/kserve/pkg/client/clientset/versioned"
 	servingv1beta1 "github.com/kserve/kserve/pkg/client/clientset/versioned/typed/serving/v1beta1"
 	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	appv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
