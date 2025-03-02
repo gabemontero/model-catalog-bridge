@@ -18,11 +18,6 @@ in this repository.
 
 Rather, visit the team's [RHDHPAI Jira project and the 'model-registry-bridge' component](https://issues.redhat.com/issues/?jql=project%20%3D%20RHDHPAI%20AND%20component%20%3D%20model-registry-bridge).
 
-As the team makes sufficient progress on the basic fit and finish items in the [roadmap](docs/roadmap.md), and sufficiently
-progresses beyond the prototype phase, we'll revisit the use of GitHub issues in this repository.
-
-See [the development guide](docs/DEVELOPMENT.md) for details on how to build and test any contributions you make.
-
 ## Usage
 
 Either via the command line, or from your favorite Golang editor, set the following environment variables as follows
