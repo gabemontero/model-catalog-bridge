@@ -1,8 +1,8 @@
 package backstage
 
 import (
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/test/stub/backstage"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/test/stub/common"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/backstage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"testing"
 )
 

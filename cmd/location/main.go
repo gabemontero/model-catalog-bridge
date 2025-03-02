@@ -2,8 +2,8 @@ package main
 
 import (
 	goflag "flag"
-	gin_gonic_http_srv "github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/cmd/server/location/server"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/util"
+	gin_gonic_http_srv "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/location/server"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"io/fs"
 	"k8s.io/klog/v2"
 	"os"

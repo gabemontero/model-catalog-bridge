@@ -3,7 +3,7 @@ package client
 import (
 	"fmt"
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"

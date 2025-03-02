@@ -3,9 +3,9 @@ package location
 import (
 	"encoding/json"
 	"fmt"
-	bridgeclient "github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/cmd/server/location/client"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/test/stub/backstage"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/test/stub/common"
+	bridgeclient "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/location/client"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/backstage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"io"
 	"net/http"
 	"net/http/httptest"

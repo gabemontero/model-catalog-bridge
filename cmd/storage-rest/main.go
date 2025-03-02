@@ -3,10 +3,10 @@ package main
 import (
 	goflag "flag"
 	"fmt"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/cmd/server/storage"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/config"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/types"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"k8s.io/klog/v2"
 	"os"
 )

@@ -3,7 +3,7 @@ package backstage
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/rest"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 )
 
 func (b *BackstageRESTClientWrapper) ListEntities() (string, error) {

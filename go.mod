@@ -1,4 +1,4 @@
-module github.com/redhat-ai-dev/rhdh-ai-catalog-cli
+module github.com/redhat-ai-dev/model-catalog-bridge
 
 go 1.22.9
 

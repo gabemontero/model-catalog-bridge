@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kubeflow/model-registry/pkg/openapi"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/rest"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 )
 
 func (k *KubeFlowRESTClientWrapper) ListRegisteredModels() ([]openapi.RegisteredModel, error) {

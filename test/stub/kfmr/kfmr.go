@@ -1,9 +1,9 @@
 package kfmr
 
 import (
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/config"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/rest"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/test/stub/common"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"net/http"
 	"net/http/httptest"
 	"strings"

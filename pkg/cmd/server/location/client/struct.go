@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/redhat-ai-dev/rhdh-ai-catalog-cli/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
