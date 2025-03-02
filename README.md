@@ -38,7 +38,7 @@ Either via the command line, or from your favorite Golang editor, set the follow
 ### storage-rest
 
 1. `RHDH_TOKEN` - the static token you create in backstage to allows for authenticated access to the Backstage catalog API.  See (https://github.com/redhat-ai-dev/rhdh-plugins/blob/main/workspaces/rhdh-ai/app-config.yaml#L19)[https://github.com/redhat-ai-dev/rhdh-plugins/blob/main/workspaces/rhdh-ai/app-config.yaml#L19]
-2. `BKSTG_TOKEN` - for now, just use `http://localhost:7007`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
+2. `BKSTG_URL` - for now, just use `http://localhost:7007`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
 3. `BRIDGE_URL` - for now, just use `http://locahost:9090`; this is the REST endpoint of our `location` container
 4. `STORAGE_TYPE` - for now, only the development mode `ConfigMap` is supported; we'll add `GitHub` soon
 5. `K8S_TOKEN`, `KUBECONFIG`, and `NAMESPACE` are the same as above
