@@ -7,7 +7,7 @@ Current status: early POC stage.
 - This repository collaborates with Backstage catalog entensions currently hosted in [our fork of the RHDH plugins repository](https://github.com/redhat-ai-dev/rhdh-plugins/tree/main/workspaces/rhdh-ai).
 - Until those plugins have assoicated images and can be added to OCP RHDH, we have to run those plugins, and by extension backstage, from our laptops.
 - By extension, the `rhoai-normalizer` and `storage-reset` containers have to run on one's laptop as well.  The `location` container can run as an OCP deployment, but it is just as easy to run it out of your laptop as well.
-- This [simple Gitops repo](https://github.com/redhat-ai-dev/odh-kubeflow-model-registry-setup) has the means of setting up Open Data Hub plus dev patches for Kubelow Model Registry that facilitate getting the URLs for running Model in RHOAI/ODH.
+- This [simple Gitops repo](https://github.com/redhat-ai-dev/odh-kubeflow-model-registry-setup) has the means of setting up Open Data Hub plus dev patches for Kubelow Model Registry that facilitate getting the URLs for running Models deployed into RHOAI/ODH by the Model Registry.
 
 
 ## Contributing
@@ -45,4 +45,4 @@ Either via the command line, or from your favorite Golang editor, set the follow
 
 ### location
 
-1. `KUBECONFIG` and `NAMESPACE` are only needed
+1. None of the above env vars are needed at this time.
