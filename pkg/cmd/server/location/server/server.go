@@ -90,6 +90,7 @@ type DicoveryResponse struct {
 func (i *ImportLocationServer) handleCatalogDiscoveryGet(c *gin.Context) {
 	d := &DicoveryResponse{}
 	for uri := range i.content {
+		//TODO normalizer id should be part of the model lookup URI a la "kubeflow/mnist/v1" or "kserve/mnist/v1"
 		d.Uris = append(d.Uris, uri)
 	}
 	content, err := json.Marshal(d)
@@ -123,6 +124,7 @@ func (u *ImportLocationServer) handleCatalogUpsertPost(c *gin.Context) {
 		c.Error(fmt.Errorf("bad key format: %s", key))
 		return
 	}
+	//TODO normalizer id should be part of the model lookup URI
 	_, uri := util.BuildImportKeyAndURI(segs[0], segs[1])
 	klog.Infof("Upserting URI %s with data of len %d", uri, len(postBody.Body))
 	il, exists := u.content[uri]

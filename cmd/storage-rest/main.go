@@ -20,6 +20,7 @@ func main() {
 
 	bs := storage.NewBridgeStorage(storageType)
 
+	//TODO maybe change to LOCATION_URL
 	bridgeURL := os.Getenv("BRIDGE_URL")
 	cfg := &config.Config{}
 	restCfg, err := util.GetK8sConfig(cfg)

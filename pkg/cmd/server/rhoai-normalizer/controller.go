@@ -216,7 +216,9 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 
 	if err != nil {
 		log.V(4).Info(fmt.Sprintf("initiating delete processing for %s", name.String()))
-		//TODO initiate delete processing
+		//TODO initiate delete processing, interacting with catalog rest API directly, our extensions are not involved;
+		//TODO or we just wait for the polling entity provide to see things are gone and delete
+		//TODO minimally we need to delete from our location service / our storage
 
 		return reconcile.Result{}, nil
 	}
@@ -331,7 +333,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							// don't just continue, try to build a catalog entry with the subset of info available
 						}
 
-						//TODO do we mandate a prop be set on the RM or MV for lifecycle?
+						//TODO do we mandate a prop be set on the RM or MV for owner,lifecycle?
 						err = kubeflowmodelregistry.CallBackstagePrinters(is.Namespace,
 							"development",
 							&rm,
@@ -347,7 +349,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							return "", "", err
 						}
 
-						//TODO iterate on the the REST URI's for our models if multi model
+						//TODO iterate on the the REST URI's for our models if multi model?
 						importKey, importURI := util.BuildImportKeyAndURI(rm.Name, mv.Name)
 						return importKey, importURI, nil
 

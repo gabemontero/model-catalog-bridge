@@ -178,7 +178,6 @@ func (pop *CommonPopulator) GetDescription() string {
 	return ""
 }
 
-// TODO won't have API until KubeFlow Model Registry gets us inferenceservice endpoints
 func (pop *CommonPopulator) GetProvidedAPIs() []string {
 	return []string{}
 }
@@ -398,7 +397,6 @@ func (pop *ResourcePopulator) GetDisplayName() string {
 	return pop.GetName()
 }
 
-// TODO Until we get the inferenceservice endpoint URL associated with the model registry related API won't have much for Backstage API here
 type ApiPopulator struct {
 	CommonPopulator
 }
@@ -417,7 +415,7 @@ func (pop *ApiPopulator) GetDefinition() string {
 }
 
 func (pop *ApiPopulator) GetTechdocRef() string {
-	// TODO in theory the Kfmr modelcard support when it arrives will influcen this
+	// TODO in theory the Kfmr modelcard support when it arrives will replace this
 	return "api/"
 }
 

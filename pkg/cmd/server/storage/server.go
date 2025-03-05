@@ -92,6 +92,7 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		c.Error(fmt.Errorf(msg))
 		return
 	}
+	//TOOD soon will have the type of normalizer preface the model name and version
 	segs := strings.Split(key, "_")
 	if len(segs) < 2 {
 		c.Status(http.StatusBadRequest)

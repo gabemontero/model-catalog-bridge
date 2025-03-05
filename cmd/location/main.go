@@ -15,6 +15,7 @@ func main() {
 	flagset := goflag.NewFlagSet("location", goflag.ContinueOnError)
 	klog.InitFlags(flagset)
 
+	//TODO remove and most likely employ some sort of fetch from the storage layer
 	content := map[string]*gin_gonic_http_srv.ImportLocation{}
 	err := filepath.Walk("/data", func(path string, info fs.FileInfo, err error) error {
 		if info == nil {
