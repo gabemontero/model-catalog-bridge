@@ -18,6 +18,11 @@ in this repository.
 
 Rather, visit the team's [RHDHPAI Jira project and the 'model-registry-bridge' component](https://issues.redhat.com/issues/?jql=project%20%3D%20RHDHPAI%20AND%20component%20%3D%20model-registry-bridge).
 
+## Prerequisites
+
+- An OpenShift cluster with 3x worker nodes, with at least 8 CPU, and 32GB memory per node. 
+   - `m6i.2xlarge` or `g5.2xlarge` (if GPUs are needed)
+
 ## Usage
 
 Either via the command line, or from your favorite Golang editor, set the following environment variables as follows
@@ -26,7 +31,7 @@ Either via the command line, or from your favorite Golang editor, set the follow
 
 1. `K8S_TOKEN` - the login/bearer token of your `kubeadmin` user for the OCP cluster you are testing on
 2. `KUBECONFIG` - the path to the local kubeconfig file corresponding to your OCP cluster
-3. `MR_ROUTE` - the output from the command `echo "https://$(oc get routes -n istio-system -l app.kubernetes.io/name=modelregistry-public -o json | jq '.items[].status.ingress[].host | select(contains("-rest"))')" | tr -d '"'`
+3. `MR_ROUTE` - the name of the Model Registry route in the `istio-system` namespace. For now, use `odh-model-registries-modelregistry-public-rest`.
 4. `NAMESPACE` - the name of the namespace you create for deploying AI models from ODH
 5. `STORAGE_URL` - for now, just use `http://localhost:7070`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
 
