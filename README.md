@@ -20,7 +20,7 @@ Rather, visit the team's [RHDHPAI Jira project and the 'model-registry-bridge' c
 
 ## Prerequisites
 
-- An OpenShift cluster with 3x worker nodes, with at least 8 CPU, and 32GB memory per node. 
+- An OpenShift cluster with 3x worker nodes, with at least 8 CPU, and 32GB memory each. 
    - on AWS `m6i.2xlarge` or `g5.2xlarge` (if GPUs are needed) work well
    - For other options, see https://aws.amazon.com/ec2/instance-types/
 
