@@ -26,7 +26,7 @@ Either via the command line, or from your favorite Golang editor, set the follow
 
 1. `K8S_TOKEN` - the login/bearer token of your `kubeadmin` user for the OCP cluster you are testing on
 2. `KUBECONFIG` - the path to the local kubeconfig file corresponding to your OCP cluster
-3. `MR_ROUTE` - the output from the command `echo "https://$(oc get routes -n istio-system -l app.kubernetes.io/name=modelregistry-public -o json | jq '.items[].status.ingress[].host | select(contains("-rest"))')" | tr -d '"`
+3. `MR_ROUTE` - the output from the command `echo "https://$(oc get routes -n istio-system -l app.kubernetes.io/name=modelregistry-public -o json | jq '.items[].status.ingress[].host | select(contains("-rest"))')" | tr -d '"'`
 4. `NAMESPACE` - the name of the namespace you create for deploying AI models from ODH
 5. `STORAGE_URL` - for now, just use `http://localhost:7070`; this will be updated when we can run this container in OCP as part of the RHDH plugin running in RHDH
 
