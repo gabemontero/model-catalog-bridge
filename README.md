@@ -48,6 +48,12 @@ Either via the command line, or from your favorite Golang editor, set the follow
 
 1. None of the above env vars are needed at this time.
 
+When you are ready to launch the 3 processes, set your current namespace to the `NAMESPACE` value:
+
+```
+oc project $NAMESPACE
+```
+
 ### Debugging (VS Code)
 
 To debug the bridge services in VS Code, a launch.json file has been provided with options to debug each of the individual services. Ensure that you launch VS Code from the same terminal window that has the above environment variables set.
