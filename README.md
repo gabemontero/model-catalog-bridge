@@ -51,3 +51,22 @@ Either via the command line, or from your favorite Golang editor, set the follow
 ### Debugging (VS Code)
 
 To debug the bridge services in VS Code, a launch.json file has been provided with options to debug each of the individual services. Ensure that you launch VS Code from the same terminal window that has the above environment variables set.
+
+### Deploying a model
+
+For our testing, we've been using the a cheap and relatively easy to deploy model the RHOAI team has posted on Hugging Face:  https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx
+
+Use a "URL Connection" when registering in Model Registry and deploying from Model Registry.  ONNX is the model format.
+
+Deploy the model in the `NAMESPACE` namespace noted above.  Also, in that namespace, creating the following `ServiceMeshMember` entry:
+
+```
+apiVersion: maistra.io/v1
+kind: ServiceMeshMember
+metadata:
+  name: default
+spec:
+  controlPlaneRef:
+    name: data-science-smcp
+    namespace: istio-system
+```
