@@ -56,6 +56,7 @@ jobs:
 
       - name: Generate types, and ensure latest changes were committed
         run: |
+          make install-quicktype
           make generate-types-all
           if [[ ! -z $(git status -s) ]]
           then
