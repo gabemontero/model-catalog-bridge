@@ -53,3 +53,13 @@ jobs:
         with:
           schema: schema/model-catalog.schema.json
           files: schema/tests/*.json
+
+      - name: Generate types, and ensure latest changes were committed
+        run: |
+          make generate-types-all
+          if [[ ! -z $(git status -s) ]]
+          then
+            echo 'Command `make generate-types-all` did introduce changes, which should not be the case if it had been run as part of the PR. Please run it locally and check in the results as part of your PR.'
+            git --no-pager diff
+            exit 1
+          fi

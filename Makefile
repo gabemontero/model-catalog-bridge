@@ -36,12 +36,12 @@ test-unit:
 install-quicktype:
 	npm install -g quicktype
 
-generate-schema-all: generate-schema-typescript generate-schema-golang
+generate-types-all: generate-typescript generate-golang
 
 # Requires quicktype to be installed before running
 # Run 'make install-quicktype' first if it's not installed
-generate-schema-typescript:
+generate-typescript:
 	cd schema/types/typescript; yarn generate
 
-generate-schema-golang:
+generate-golang:
 	cd schema; sed 's|\#/$$defs/modelServerAPI|\#/$$defs/modelServer/$$defs/modelServerAPI|g' model-catalog.schema.json | quicktype -s schema -o types/golang/model-catalog.go --package golang
