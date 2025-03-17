@@ -13,7 +13,6 @@ import (
 	"github.com/kubeflow/model-registry/pkg/openapi"
 	routev1 "github.com/openshift/api/route/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kserve"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kubeflowmodelregistry"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
 	bridgerest "github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
@@ -28,6 +27,7 @@ import (
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -244,16 +244,19 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	}
 	if len(importKey) == 0 {
 		// KServe only
+		//TODO we will deal with kserve-only and reconciling timing issues where a model is discovered via kserve-only
+		// mode first, but then later on we are able to correlate that running model with a KFMR entry
 
 		//TODO do we mandate a prop be set on the RM or MV for lifecycle?
-		err = kserve.CallBackstagePrinters(is.Namespace, "developement", is, bwriter)
-
-		if err != nil {
-			return reconcile.Result{}, nil
-		}
-
-		importKey, importURI = util.BuildImportKeyAndURI(is.Namespace, is.Name)
-
+		//err = kserve.CallBackstagePrinters(is.Namespace, "developement", is, bwriter)
+		//
+		//if err != nil {
+		//	return reconcile.Result{}, nil
+		//}
+		//
+		//importKey, importURI = util.BuildImportKeyAndURI(is.Namespace, is.Name)
+		klog.Infof("inference service %s:%s does not correlate to a kubeflow model registry entry", is.Namespace, is.Name)
+		return reconcile.Result{}, nil
 	}
 
 	err = r.processBWriter(ctx, bwriter, buf, importKey, importURI)

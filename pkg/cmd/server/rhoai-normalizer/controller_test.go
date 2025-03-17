@@ -51,6 +51,7 @@ func TestReconcile(t *testing.T) {
 		is            *serverapiv1beta1.InferenceService
 		route         *routev1.Route
 		kfmrSvr       *httptest.Server
+		expectedFound bool
 		expectedValue string
 	}{
 		{
@@ -60,7 +61,8 @@ func TestReconcile(t *testing.T) {
 				Spec:       serverapiv1beta1.InferenceServiceSpec{},
 				Status:     serverapiv1beta1.InferenceServiceStatus{},
 			},
-			expectedValue: "description: KServe instance foo:bar",
+			//TODO set expectedFound to true and check for this expectedValue with kserve-only is readded after summit
+			//expectedValue: "description: KServe instance foo:bar",
 		},
 		{
 			name: "kserve inference service with kubeflow route but not kubeflow inference service",
@@ -75,8 +77,9 @@ func TestReconcile(t *testing.T) {
 				Spec:       serverapiv1beta1.InferenceServiceSpec{},
 				Status:     serverapiv1beta1.InferenceServiceStatus{},
 			},
-			kfmrSvr:       kts2,
-			expectedValue: "description: KServe instance faa:bor",
+			kfmrSvr: kts2,
+			//TODO set expectedFound to true and check for this expectedValue with kserve-only is readded after summit
+			//expectedValue: "description: KServe instance faa:bor",
 		},
 		{
 			name: "kserve inference service with kubeflow route and kubeflow inference service",
@@ -92,6 +95,7 @@ func TestReconcile(t *testing.T) {
 				Status:     serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:       kts1,
+			expectedFound: true,
 			expectedValue: "url: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx",
 		},
 	} {
@@ -115,7 +119,7 @@ func TestReconcile(t *testing.T) {
 
 			return true
 		})
-		common.AssertEqual(t, found, true)
+		common.AssertEqual(t, tc.expectedFound, found)
 	}
 }
 
