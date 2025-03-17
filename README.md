@@ -51,3 +51,9 @@ Either via the command line, or from your favorite Golang editor, set the follow
 ### Debugging (VS Code)
 
 To debug the bridge services in VS Code, a launch.json file has been provided with options to debug each of the individual services. Ensure that you launch VS Code from the same terminal window that has the above environment variables set.
+
+## Model Catalog Schema
+
+The schema that the model catalog bridge will use to collect model and model server metadata can be found under [schema/](./schema/).
+
+To re-generate the types that correspond to the schema, run `make generate-types-all`.
