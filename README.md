@@ -76,3 +76,9 @@ spec:
     name: data-science-smcp
     namespace: istio-system
 ```
+
+## Model Catalog Schema
+
+The schema that the model catalog bridge will use to collect model and model server metadata can be found under [schema/](./schema/).
+
+To re-generate the types that correspond to the schema, run `make generate-types-all`.

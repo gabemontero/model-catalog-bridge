@@ -40,15 +40,27 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      # Validate the 
+      # Validate the JSON schemas
       - name: Validate model catalog JSON schema
         uses: dsanders11/json-schema-validate-action@v1.2.0
         with:
           schema: json-schema
           files: schema/model-catalog.schema.json
 
+      # Run tests against the schema
       - name: Test the model catalog JSON schema
         uses: dsanders11/json-schema-validate-action@v1.2.0
         with:
           schema: schema/model-catalog.schema.json
           files: schema/tests/*.json
+
+      - name: Generate types, and ensure latest changes were committed
+        run: |
+          make install-quicktype
+          make generate-types-all
+          if [[ ! -z $(git status -s) ]]
+          then
+            echo 'Command `make generate-types-all` did introduce changes, which should not be the case if it had been run as part of the PR. Please run it locally and check in the results as part of your PR.'
+            git --no-pager diff
+            exit 1
+          fi

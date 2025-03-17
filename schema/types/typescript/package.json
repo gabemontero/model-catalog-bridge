@@ -1,0 +1,20 @@
+{
+    "private": true,
+    "name": "@redhat-ai-dev/model-catalog-types",
+    "version": "1.0.0",
+    "scripts": {
+        "generate": "sed 's|#/$defs/modelServerAPI|#/$defs/modelServer/$defs/modelServerAPI|g' ../../model-catalog.schema.json | quicktype -s schema -o index.d.ts --just-types --top-level ModelCatalog"
+      },
+    "projects": [
+        "https://github.com/redhat-ai-dev/model-catalog-bridge/"
+    ],
+    "devDependencies": {
+        "@redhat-ai-dev/model-catalog-types": "workspace:."
+    },
+    "owners": [
+        {
+            "name": "John Collier",
+            "githubUsername": "johnmcollier"
+        }
+    ]
+}
