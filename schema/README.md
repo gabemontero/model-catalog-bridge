@@ -10,6 +10,8 @@ The schema can currently be used to map metadata to the Backstage catalog from t
 2) A standalone model, without a server or API exposing it
     - With only `models` specified using the schema
 
+<img width="706" alt="Screenshot 2025-03-17 at 4 10 34 PM" src="https://github.com/user-attachments/assets/6fb4d07c-ffe5-45b0-ae7d-9b8f42eb7e90" />
+
 See below for how the metadata maps into Backstage catalog entities
 
 ## Model Catalog Structure:
