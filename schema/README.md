@@ -5,7 +5,8 @@ The goal of the [model catalog schema](./model-catalog.schema.json) is to provid
 The schema can currently be used to map metadata to the Backstage catalog from the following scenarios:
 
 1) A Model/inference server deployed with one or more models, and an exposed API
-    - With both `modelServer` and `models` specified using the schema
+    - With `modelServer` and `modelServerAPI` defining the model server and API metadata
+    - With `model` defining the model metadata
 2) A standalone model, without a server or API exposing it
     - With only `models` specified using the schema
 
@@ -25,4 +26,3 @@ In the Backstage Model Catalog:
 ![AI Catalog](https://github.com/redhat-ai-dev/model-catalog-example/blob/main/assets/catalog-graph.png?raw=true "AI Catalog")
 
 A reference model catalog schema can be found [here](https://github.com/redhat-ai-dev/model-catalog-example/blob/main/developer-model-service/catalog-info.yaml)
-
