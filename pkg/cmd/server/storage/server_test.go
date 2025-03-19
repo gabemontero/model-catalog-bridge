@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	bkstgclient "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage/configmap"
@@ -24,6 +25,99 @@ import (
 	"sync"
 	"testing"
 )
+
+func Test_handleCatalogList_handleCatalogFetch_ConfigMap(t *testing.T) {
+	cmCl := fake.NewClientset().CoreV1()
+	cm := &corev1.ConfigMap{}
+	cm.Name = util.StorageConfigMapName
+	var err error
+	cm, err = cmCl.ConfigMaps(metav1.NamespaceDefault).Create(context.Background(), cm, metav1.CreateOptions{})
+	common.AssertError(t, err)
+
+	sb := &types.StorageBody{
+		Body:           []byte("foo"),
+		LocationId:     "loc-id",
+		LocationTarget: "http://foo.com/foo-data",
+	}
+	sbBuf := []byte{}
+	sbBuf, err = json.Marshal(sb)
+	common.AssertError(t, err)
+
+	for _, tc := range []struct {
+		name         string
+		reqURL       url.URL
+		expectedSC   int
+		expectedKeys []string
+		cmData       map[string][]byte
+	}{
+		{
+			name:         "updated entry",
+			reqURL:       url.URL{},
+			expectedKeys: []string{"v1", "v2", "v3"},
+			cmData: map[string][]byte{
+				"v1": sbBuf,
+				"v2": sbBuf,
+				"v3": sbBuf,
+			},
+			expectedSC: http.StatusOK,
+		},
+	} {
+		testWriter := testgin.NewTestResponseWriter()
+		ctx, eng := gin.CreateTestContext(testWriter)
+		ctx.Request = &http.Request{URL: &url.URL{}}
+
+		cms := configmap.NewConfigMapBridgeStorageForTest(metav1.NamespaceDefault, cmCl)
+
+		s := &StorageRESTServer{
+			router:          eng,
+			st:              cms,
+			mutex:           sync.Mutex{},
+			pushedLocations: map[string]*types.StorageBody{},
+		}
+
+		cm.BinaryData = tc.cmData
+		cm, err = cmCl.ConfigMaps(metav1.NamespaceDefault).Update(context.Background(), cm, metav1.UpdateOptions{})
+		common.AssertError(t, err)
+
+		s.handleCatalogList(ctx)
+
+		common.AssertEqual(t, ctx.Writer.Status(), tc.expectedSC)
+
+		rcvdDiscResp := &DiscoverResponse{}
+		err = json.Unmarshal(testWriter.ResponseWriter.Body.Bytes(), rcvdDiscResp)
+		common.AssertError(t, err)
+
+		for _, ek := range tc.expectedKeys {
+			t.Logf("looking for key %s", ek)
+			found := false
+			for _, gk := range rcvdDiscResp.Keys {
+				if gk == ek {
+					t.Logf("found key %s", ek)
+					found = true
+					break
+				}
+			}
+			common.AssertEqual(t, true, found)
+		}
+
+		for _, k := range tc.expectedKeys {
+			testWriter = testgin.NewTestResponseWriter()
+			ctx, eng = gin.CreateTestContext(testWriter)
+			ctx.Request = &http.Request{URL: &url.URL{RawQuery: fmt.Sprintf("key=%s", k)}}
+
+			s.handleCatalogFetch(ctx)
+
+			common.AssertEqual(t, ctx.Writer.Status(), tc.expectedSC)
+			rcvdStoBod := &types.StorageBody{}
+			err = json.Unmarshal(testWriter.ResponseWriter.Body.Bytes(), rcvdStoBod)
+			common.AssertError(t, err)
+			common.AssertEqual(t, sb.LocationId, rcvdStoBod.LocationId)
+			common.AssertEqual(t, sb.LocationTarget, rcvdStoBod.LocationTarget)
+		}
+
+	}
+
+}
 
 func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *testing.T) {
 	locationCallback := sync.Map{}
