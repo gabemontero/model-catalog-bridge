@@ -1,46 +1,61 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type ImportLocationServer struct {
 	router  *gin.Engine
 	content map[string]*ImportLocation
+	storage *storage.BridgeStorageRESTClient
 }
 
-func NewImportLocationServer(content map[string]*ImportLocation) *ImportLocationServer {
+func NewImportLocationServer(stURL string) *ImportLocationServer {
+	//var content map[string]*ImportLocation
 	gin.SetMode(gin.ReleaseMode)
+	cfg, _ := util.GetK8sConfig(&config.Config{})
 	r := gin.Default()
 	i := &ImportLocationServer{
 		router:  r,
-		content: content,
+		content: map[string]*ImportLocation{},
+		storage: storage.SetupBridgeStorageRESTClient(stURL, util.GetCurrentToken(cfg)),
 	}
-	klog.Infof("NewImportLocationServer content len %d", len(content))
 	r.SetTrustedProxies(nil)
 	r.TrustedPlatform = "X-Forwarded-For"
 	r.Use(addRequestId())
-	d := &DicoveryResponse{Uris: []string{}}
-	for key, data := range content {
-		klog.Infof("NewImportLocationServer looking at key %s and content len %d", key, len(data.content))
-		il := &ImportLocation{content: data.content}
-		segs := strings.Split(key, "_")
-		if len(segs) < 2 {
-			continue
-		}
-		_, uri := util.BuildImportKeyAndURI(segs[0], segs[1])
-		klog.Infoln("Adding URI " + uri)
-		r.GET(uri, il.handleCatalogInfoGet)
-		d.Uris = append(d.Uris, uri)
-	}
+
+	// approach for implementing background processing with gin gonic discovered via some AI interaction;
+	// with this, the location service will wait for up to an hour to bootstrap from the storage service;
+	// this also gives us the option of re-triggering the backgound location/storage sync if that ever became
+	// a useful diagnostic/recovery exercise.
+	r.GET(util.BackgroundStoragePoll, func(c *gin.Context) {
+		// Copy the context to use it safely in the background goroutine
+		ctx := c.Copy()
+
+		// goroutine for the background task
+		go func() {
+			wait.PollUntilContextTimeout(ctx, 30*time.Second, 1*time.Hour, true, func(context.Context) (done bool, err error) {
+				return i.loadFromStorage()
+			})
+		}()
+
+		c.String(http.StatusOK, "Request received, processing in the background")
+	})
+
+	klog.Infof("NewImportLocationServer content len %d", len(i.content))
 	r.GET(util.ListURI, i.handleCatalogDiscoveryGet)
 	r.POST(util.UpsertURI, i.handleCatalogUpsertPost)
 	r.DELETE(util.RemoveURI, i.handleCatalogDelete)
@@ -55,6 +70,41 @@ func addRequestId() gin.HandlerFunc {
 		c.Set("requestId", uuid.New().String())
 		c.Next()
 	}
+}
+
+func (i *ImportLocationServer) loadFromStorage() (bool, error) {
+	rc, msg, err, keys := i.storage.ListModels()
+	if err != nil {
+		klog.Errorf("%s: %s", err.Error(), msg)
+		return false, nil
+	}
+	if rc != http.StatusOK {
+		klog.Errorf("bad response code from storage list models %d, %s", rc, msg)
+		return false, nil
+	}
+
+	for _, key := range keys {
+		segs := strings.Split(key, "_")
+		if len(segs) < 2 {
+			klog.Errorf("bad format for key from ListModels when splitting with '_': %s", key)
+			continue
+		}
+		il := &ImportLocation{}
+		rc, msg, err, il.content = i.storage.FetchModel(key)
+		if err != nil {
+			klog.Errorf("%s: %s", err.Error(), msg)
+			return false, nil
+		}
+		if rc != http.StatusOK {
+			klog.Errorf("bad response code from storage fetch model %s is %d, %s", key, rc, msg)
+			return false, nil
+		}
+		_, uri := util.BuildImportKeyAndURI(segs[0], segs[1])
+		i.content[uri] = il
+		i.router.GET(uri, il.handleCatalogInfoGet)
+	}
+
+	return true, nil
 }
 
 func (i *ImportLocationServer) Run(stopCh <-chan struct{}) {

@@ -34,7 +34,7 @@ func TestReconcile(t *testing.T) {
 	brts := location.CreateBridgeLocationServer(t)
 	defer brts.Close()
 	callback := sync.Map{}
-	bsts := storage.CreateBridgeStorageRESTClient(t, &callback)
+	bsts := storage.CreateBridgeStorageREST(t, &callback)
 	defer bsts.Close()
 
 	r := &RHOAINormalizerReconcile{
@@ -133,7 +133,7 @@ func TestStart(t *testing.T) {
 	brts := location.CreateBridgeLocationServer(t)
 	defer brts.Close()
 	callback := sync.Map{}
-	bsts := storage.CreateBridgeStorageRESTClient(t, &callback)
+	bsts := storage.CreateBridgeStorageREST(t, &callback)
 	defer bsts.Close()
 
 	r := &RHOAINormalizerReconcile{
@@ -219,7 +219,7 @@ func TestStartArchived(t *testing.T) {
 	brts := location.CreateBridgeLocationServer(t)
 	defer brts.Close()
 	callback := sync.Map{}
-	bsts := storage.CreateBridgeStorageRESTClient(t, &callback)
+	bsts := storage.CreateBridgeStorageREST(t, &callback)
 	defer bsts.Close()
 
 	r := &RHOAINormalizerReconcile{

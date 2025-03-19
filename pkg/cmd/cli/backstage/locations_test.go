@@ -1,6 +1,7 @@
 package backstage
 
 import (
+	"fmt"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/backstage"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"testing"
@@ -20,12 +21,37 @@ func TestGetLocations(t *testing.T) {
 	defer ts.Close()
 
 	key := "key1"
-	str, err := SetupBackstageTestRESTClient(ts).GetLocation(key)
+	str, err := SetupBackstageTestRESTClient(ts).GetLocations(key)
 	common.AssertError(t, err)
 	common.AssertContains(t, str, []string{key})
 }
 
+func TestGetLocation(t *testing.T) {
+	ts := backstage.CreateServer(t)
+	defer ts.Close()
+
+	key := "TestGet"
+	m, err := SetupBackstageTestRESTClient(ts).GetLocation(key)
+	common.AssertError(t, err)
+	keysStr := ""
+	for k := range m {
+		keysStr = fmt.Sprintf("%s;%s", keysStr, k)
+	}
+	common.AssertContains(t, keysStr, []string{key})
+}
+
 func TestGetLocationsError(t *testing.T) {
+	ts := backstage.CreateServer(t)
+	defer ts.Close()
+
+	nsName := "404:404"
+	_, err := SetupBackstageTestRESTClient(ts).GetLocations(nsName)
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestGetLocationError(t *testing.T) {
 	ts := backstage.CreateServer(t)
 	defer ts.Close()
 

@@ -6,13 +6,43 @@ import (
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	testgin "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/gin-gonic"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/storage"
 	"io"
 	"k8s.io/apimachinery/pkg/util/json"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 )
+
+func TestLoadFromStorage(t *testing.T) {
+	callback := &sync.Map{}
+	st := storage.CreateBridgeStorageREST(t, callback)
+	defer st.Close()
+	testWriter := testgin.NewTestResponseWriter()
+	ctx, eng := gin.CreateTestContext(testWriter)
+	ils := &ImportLocationServer{
+		router:  eng,
+		content: map[string]*ImportLocation{},
+		storage: storage.SetupBridgeStorageRESTClient(st),
+	}
+
+	done, err := ils.loadFromStorage()
+
+	common.AssertError(t, err)
+	common.AssertEqual(t, true, done)
+	common.AssertEqual(t, http.StatusOK, ctx.Writer.Status())
+
+	called := false
+	callback.Range(func(key, value any) bool {
+		called = true
+		return true
+	})
+	common.AssertEqual(t, true, called)
+	bodyBuf := testWriter.ResponseWriter.Body
+	common.AssertNotNil(t, bodyBuf)
+}
 
 func TestHandleCatalogDiscoveryGet(t *testing.T) {
 	for _, tc := range []struct {

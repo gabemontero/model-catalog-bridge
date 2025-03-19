@@ -11,9 +11,10 @@ type BridgeStorage interface {
 }
 
 type StorageBody struct {
-	Body           []byte `json:"body"`
-	LocationId     string `json:"locationId"`
-	LocationTarget string `json:"locationTarget"`
+	Body            []byte `json:"body"`
+	LocationId      string `json:"locationId"`
+	LocationTarget  string `json:"locationTarget"`
+	LocationIDValid bool   `json:"locationIDValid"`
 }
 
 type BridgeStorageType string
