@@ -416,9 +416,9 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 			continue
 		}
 		for _, mv := range mva {
-			importKey := rm.Name + "_" + mv.Name
+
+			importKey, importURI := util.BuildImportKeyAndURI(rm.Name, mv.Name)
 			keys = append(keys, importKey)
-			importURI := "/" + rm.Name + "/" + mv.Name + "/catalog-info.yaml"
 			err = r.processBWriter(ctx, bwriter, buf, importKey, importURI)
 			if err != nil {
 				controllerLog.Error(err, "error processing KFMR writer")
