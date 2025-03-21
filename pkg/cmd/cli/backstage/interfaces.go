@@ -1,11 +1,152 @@
 package backstage
 
+// model catalog json schema populators
+
 import (
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"io"
 	"k8s.io/klog/v2"
 	"strings"
 )
+
+type ModelCatalogPopulator interface {
+	GetModels() []golang.Model
+	GetModelServer() *golang.ModelServer
+}
+
+type CommonModelSchemaPopulator interface {
+	GetName() string
+	GetOwner() string
+	GetLifecyle() string
+	GetDescription() string
+	GetTags() []string
+}
+
+type ModelServerPopulator interface {
+	CommonModelSchemaPopulator
+
+	GetAPI() *golang.API
+	GetAuthentication() *bool
+	GetHomepageURL() *string
+	GetUsage() *string
+}
+
+type ModelPopulator interface {
+	CommonModelSchemaPopulator
+
+	GetArtifactLocationURL() *string
+	GetEthics() *string
+	GetHowToUseURL() *string
+	GetSupport() *string
+	GetTraining() *string
+	GetUsage() *string
+}
+
+type ModelServerAPIPopulator interface {
+	GetSpec() string
+	GetTags() []string
+	GetType() golang.Type
+	GetURL() string
+}
+
+func PrintModelCatalogPopulator(svrPop ModelServerPopulator, modPops []ModelPopulator, writer io.Writer) error {
+	modelCatalog := &golang.ModelCatalog{
+		Models: nil,
+		ModelServer: &golang.ModelServer{
+			API:            svrPop.GetAPI(),
+			Authentication: svrPop.GetAuthentication(),
+			Description:    svrPop.GetDescription(),
+			HomepageURL:    svrPop.GetHomepageURL(),
+			Lifecycle:      svrPop.GetLifecyle(),
+			Name:           svrPop.GetName(),
+			Owner:          svrPop.GetOwner(),
+			Tags:           svrPop.GetTags(),
+			Usage:          svrPop.GetUsage(),
+		},
+	}
+	for _, modPop := range modPops {
+		model := golang.Model{
+			ArtifactLocationURL: modPop.GetArtifactLocationURL(),
+			Description:         modPop.GetDescription(),
+			Ethics:              modPop.GetEthics(),
+			HowToUseURL:         modPop.GetHowToUseURL(),
+			Lifecycle:           modPop.GetLifecyle(),
+			Name:                modPop.GetName(),
+			Owner:               modPop.GetOwner(),
+			Support:             modPop.GetSupport(),
+			Tags:                modPop.GetTags(),
+			Training:            modPop.GetTraining(),
+			Usage:               modPop.GetUsage(),
+		}
+		modelCatalog.Models = append(modelCatalog.Models, model)
+	}
+	err := util.PrintYaml(modelCatalog, false, writer)
+	if err != nil {
+		klog.Errorf("ERROR: converting ModelCatalog to yaml and printing: %s, %#v", err.Error(), modelCatalog)
+		return err
+	}
+	return nil
+}
+
+func PrintModelServerPopulator(pop ModelServerPopulator, writer io.Writer) error {
+	modelServer := &golang.ModelServer{
+		API:            pop.GetAPI(),
+		Authentication: pop.GetAuthentication(),
+		Description:    pop.GetDescription(),
+		HomepageURL:    pop.GetHomepageURL(),
+		Lifecycle:      pop.GetLifecyle(),
+		Name:           pop.GetName(),
+		Owner:          pop.GetOwner(),
+		Tags:           pop.GetTags(),
+		Usage:          pop.GetUsage(),
+	}
+	err := util.PrintYaml(modelServer, false, writer)
+	if err != nil {
+		klog.Errorf("ERROR: converting ModelServer to yaml and printing: %s, %#v", err.Error(), modelServer)
+		return err
+	}
+	return nil
+}
+
+func PrintModelPopulator(pop ModelPopulator, writer io.Writer) error {
+	model := &golang.Model{
+		ArtifactLocationURL: pop.GetArtifactLocationURL(),
+		Description:         pop.GetDescription(),
+		Ethics:              pop.GetEthics(),
+		HowToUseURL:         pop.GetHowToUseURL(),
+		Lifecycle:           pop.GetLifecyle(),
+		Name:                pop.GetName(),
+		Owner:               pop.GetOwner(),
+		Support:             pop.GetSupport(),
+		Tags:                pop.GetTags(),
+		Training:            pop.GetTraining(),
+		Usage:               pop.GetUsage(),
+	}
+	err := util.PrintYaml(model, false, writer)
+	if err != nil {
+		klog.Errorf("ERROR: converting Model to yaml and printing: %s, %#v", err.Error(), model)
+		return err
+	}
+	return nil
+}
+
+func PrintModelServerAPI(pop ModelServerAPIPopulator, writer io.Writer) error {
+	modelServerAPI := &golang.API{
+		Spec: pop.GetSpec(),
+		Tags: pop.GetTags(),
+		Type: pop.GetType(),
+		URL:  pop.GetURL(),
+	}
+	err := util.PrintYaml(modelServerAPI, false, writer)
+	if err != nil {
+		klog.Errorf("ERROR: converting API to yaml and printing: %s, %#v", err.Error(), modelServerAPI)
+		return err
+	}
+	return nil
+}
+
+// catalog-info.yaml populators
 
 type CommonPopulator interface {
 	GetOwner() string
