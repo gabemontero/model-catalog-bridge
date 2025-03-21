@@ -7,12 +7,14 @@ import (
 	"github.com/kubeflow/model-registry/pkg/openapi"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kserve"
+	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"os"
 	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -137,6 +139,7 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 	models := []golang.Model{}
 	for mvidx, mv := range m.ModelVersions {
 		mPop := ModelPopulator{MVIndex: mvidx}
+		m.MPops = append(m.MPops, &mPop)
 		mas := m.ModelArtifacts[mv.GetId()]
 		for maidx, ma := range mas {
 			if ma.GetId() == m.RegisteredModel.GetId() {
@@ -199,7 +202,7 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 			}
 		}
 
-		msPop := &ModelServerPopulator{
+		m.MSPop = &ModelServerPopulator{
 			CommonSchemaPopulator: m.CommonSchemaPopulator,
 			ApiPop:                apiPop,
 			InfSvcIndex:           infSvcIdx,
@@ -214,14 +217,14 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 				Type: apiPop.GetType(),
 				URL:  apiPop.GetURL(),
 			},
-			Authentication: msPop.GetAuthentication(),
-			Description:    msPop.GetDescription(),
-			HomepageURL:    msPop.GetHomepageURL(),
-			Lifecycle:      msPop.GetLifecycle(),
-			Name:           msPop.GetName(),
-			Owner:          msPop.GetOwner(),
-			Tags:           msPop.GetTags(),
-			Usage:          msPop.GetUsage(),
+			Authentication: m.MSPop.GetAuthentication(),
+			Description:    m.MSPop.GetDescription(),
+			HomepageURL:    m.MSPop.GetHomepageURL(),
+			Lifecycle:      m.MSPop.GetLifecycle(),
+			Name:           m.MSPop.GetName(),
+			Owner:          m.MSPop.GetOwner(),
+			Tags:           m.MSPop.GetTags(),
+			Usage:          m.MSPop.GetUsage(),
 		}
 	}
 	return nil
@@ -452,37 +455,50 @@ func CallBackstagePrinters(owner, lifecycle string, rm *openapi.RegisteredModel,
 	compPop.InferenceServices = isl
 	compPop.Kis = is
 	compPop.CtrlClient = client
-	err := backstage.PrintComponent(&compPop, writer)
-	if err != nil {
-		return err
-	}
 
-	resPop := ResourcePopulator{}
-	resPop.Owner = owner
-	resPop.Lifecycle = lifecycle
-	resPop.Kfmr = kfmr
-	resPop.RegisteredModel = rm
-	resPop.Kis = is
-	resPop.CtrlClient = client
-	for _, mv := range mvs {
-		resPop.ModelVersion = &mv
-		m, _ := mas[*mv.Id]
-		resPop.ModelArtifacts = m
-		err = backstage.PrintResource(&resPop, writer)
+	format := os.Getenv(brdgtypes.FormatEnvVar)
+	switch brdgtypes.NormalizerFormat(format) {
+	case brdgtypes.JsonArrayForamt:
+		mcPop := ModelCatalogPopulator{CommonSchemaPopulator: CommonSchemaPopulator{compPop}}
+		return backstage.PrintModelCatalogPopulator(&mcPop, writer)
+	case brdgtypes.CatalogInfoYamlFormat:
+		fallthrough
+	default:
+		err := backstage.PrintComponent(&compPop, writer)
 		if err != nil {
 			return err
 		}
+
+		resPop := ResourcePopulator{}
+		resPop.Owner = owner
+		resPop.Lifecycle = lifecycle
+		resPop.Kfmr = kfmr
+		resPop.RegisteredModel = rm
+		resPop.Kis = is
+		resPop.CtrlClient = client
+		for _, mv := range mvs {
+			resPop.ModelVersion = &mv
+			m, _ := mas[*mv.Id]
+			resPop.ModelArtifacts = m
+			err = backstage.PrintResource(&resPop, writer)
+			if err != nil {
+				return err
+			}
+		}
+
+		apiPop := ApiPopulator{}
+		apiPop.Owner = owner
+		apiPop.Lifecycle = lifecycle
+		apiPop.Kfmr = kfmr
+		apiPop.RegisteredModel = rm
+		apiPop.InferenceServices = isl
+		apiPop.Kis = is
+		apiPop.CtrlClient = client
+		return backstage.PrintAPI(&apiPop, writer)
 	}
 
-	apiPop := ApiPopulator{}
-	apiPop.Owner = owner
-	apiPop.Lifecycle = lifecycle
-	apiPop.Kfmr = kfmr
-	apiPop.RegisteredModel = rm
-	apiPop.InferenceServices = isl
-	apiPop.Kis = is
-	apiPop.CtrlClient = client
-	return backstage.PrintAPI(&apiPop, writer)
+	return nil
+
 }
 
 type CommonPopulator struct {
