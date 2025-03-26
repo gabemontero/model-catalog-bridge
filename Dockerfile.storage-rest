@@ -8,13 +8,14 @@ COPY go.sum go.sum
 COPY vendor/ vendor/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
+COPY test/ test/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o location ./cmd/location/...
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o storage-rest ./cmd/storage-rest/...
 
 FROM registry.access.redhat.com/ubi9-minimal:9.1.0
 
-COPY --from=builder /opt/app-root/src/location /usr/local/bin/location
+COPY --from=builder /opt/app-root/src/storage-rest /usr/local/bin/storage-rest
 
 USER 65532:65532
 
-ENTRYPOINT [ "location" ]
+ENTRYPOINT [ "storage-rest" ]

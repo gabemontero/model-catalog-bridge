@@ -9,12 +9,12 @@ COPY vendor/ vendor/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o location ./cmd/location/...
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -o rhoai-normalizer ./cmd/rhoai-normalizer/...
 
 FROM registry.access.redhat.com/ubi9-minimal:9.1.0
 
-COPY --from=builder /opt/app-root/src/location /usr/local/bin/location
+COPY --from=builder /opt/app-root/src/rhoai-normalizer /usr/local/bin/rhoai-normalizer
 
 USER 65532:65532
 
-ENTRYPOINT [ "location" ]
+ENTRYPOINT [ "rhoai-normalizer" ]

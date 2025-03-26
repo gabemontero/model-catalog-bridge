@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
-	bksgcli "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
+	bkstgclient "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage/configmap"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
@@ -87,7 +87,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 			mutex:           sync.Mutex{},
 			pushedLocations: map[string]*types.StorageBody{},
 			locations:       location.SetupBridgeLocationRESTClient(brts),
-			bkstg:           bksgcli.SetupBackstageTestRESTClient(bks),
+			bkstg:           (&bkstgclient.BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: bks.URL}),
 		}
 
 		s.handleCatalogUpsertPost(ctx)
@@ -170,7 +170,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 		mutex:           sync.Mutex{},
 		pushedLocations: map[string]*types.StorageBody{},
 		locations:       location.SetupBridgeLocationRESTClient(brts),
-		bkstg:           bksgcli.SetupBackstageTestRESTClient(bks),
+		bkstg:           (&bkstgclient.BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: bks.URL}),
 	}
 
 	s.handleCatalogCurrentKeySetPost(ctx)
