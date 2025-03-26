@@ -7,9 +7,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
-	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"k8s.io/klog/v2"
-	"net/http/httptest"
 	nurl "net/url"
 	"os"
 )
@@ -137,11 +135,4 @@ func (k *BackstageRESTClientWrapper) deleteFromBackstage(url string) (string, er
 		return "", err
 	}
 	return k.processDelete(resp, url, "delete")
-}
-
-func SetupBackstageTestRESTClient(ts *httptest.Server) *BackstageRESTClientWrapper {
-	backstageTestRESTClient := &BackstageRESTClientWrapper{}
-	backstageTestRESTClient.RESTClient = common.DC()
-	backstageTestRESTClient.RootURL = ts.URL
-	return backstageTestRESTClient
 }

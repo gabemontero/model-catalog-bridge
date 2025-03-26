@@ -11,7 +11,7 @@ func TestListResources(t *testing.T) {
 	defer ts.Close()
 
 	// Get with no args calls List
-	str, err := SetupBackstageTestRESTClient(ts).GetResource()
+	str, err := (&BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: ts.URL}).GetResource()
 	common.AssertError(t, err)
 	common.AssertLineCompare(t, str, common.Resources, 0)
 }
@@ -21,7 +21,7 @@ func TestGetResources(t *testing.T) {
 	defer ts.Close()
 
 	nsName := "default:phi-mini-instruct"
-	str, err := SetupBackstageTestRESTClient(ts).GetResource(nsName)
+	str, err := (&BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: ts.URL}).GetResource(nsName)
 
 	common.AssertError(t, err)
 	common.AssertContains(t, str, []string{nsName})
@@ -32,7 +32,7 @@ func TestGetResourceError(t *testing.T) {
 	defer ts.Close()
 
 	nsName := "404:404"
-	_, err := SetupBackstageTestRESTClient(ts).GetResource(nsName)
+	_, err := (&BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: ts.URL}).GetResource(nsName)
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -42,7 +42,7 @@ func TestGetResourceWithTags(t *testing.T) {
 	ts := backstage.CreateServer(t)
 	defer ts.Close()
 
-	bs := SetupBackstageTestRESTClient(ts)
+	bs := (&BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: ts.URL})
 	bs.Tags = true
 
 	for _, tc := range []struct {

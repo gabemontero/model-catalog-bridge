@@ -10,7 +10,7 @@ func TestListEntities(t *testing.T) {
 	ts := backstage.CreateServer(t)
 	defer ts.Close()
 
-	str, err := SetupBackstageTestRESTClient(ts).ListEntities()
+	str, err := (&BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: ts.URL}).ListEntities()
 	common.AssertError(t, err)
 	common.AssertEqual(t, common.TestJSONStringIndented, str)
 }
