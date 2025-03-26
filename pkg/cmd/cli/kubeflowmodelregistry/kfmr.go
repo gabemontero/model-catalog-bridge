@@ -543,7 +543,7 @@ func (pop *ComponentPopulator) GetName() string {
 
 func (pop *ComponentPopulator) GetLinks() []backstage.EntityLink {
 	links := pop.getLinksFromInferenceServices()
-	// GGM maybe multi resource / multi model indication
+	//TODO maybe multi resource / multi model indication
 	for _, maa := range pop.ModelArtifacts {
 		for _, ma := range maa {
 			if ma.Uri != nil {
@@ -674,7 +674,7 @@ func (pop *ResourcePopulator) GetTechdocRef() string {
 
 func (pop *ResourcePopulator) GetLinks() []backstage.EntityLink {
 	links := []backstage.EntityLink{}
-	// GGM maybe multi resource / multi model indication
+	//TODO maybe multi resource / multi model indication
 	for _, ma := range pop.ModelArtifacts {
 		if ma.Uri != nil {
 			links = append(links, backstage.EntityLink{
