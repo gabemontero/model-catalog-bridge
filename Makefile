@@ -13,6 +13,14 @@ INSTALL_LOCATION ?= /usr/local/bin
 
 ARGS ?=
 
+CONTAINER_ENGINE ?= podman
+LOCATION_SERVICE_IMAGE ?= quay.io/redhat-ai-dev/model-catalog-location-service
+LOCATION_SERVICE_TAG ?= latest
+RHOAI_NORMALIZER_IMAGE ?= quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer
+RHOAI_NORMALIZER_TAG ?= latest
+STORAGE_REST_IMAGE ?= quay.io/redhat-ai-dev/model-catalog-storage-rest
+STORAGE_REST_TAG ?= latest
+
 .EXPORT_ALL_VARIABLES:
 
 
@@ -45,3 +53,14 @@ generate-typescript:
 
 generate-golang:
 	cd schema; sed 's|\#/$$defs/modelServerAPI|\#/$$defs/modelServer/$$defs/modelServerAPI|g' model-catalog.schema.json | quicktype -s schema -o types/golang/model-catalog.go --package golang
+
+build-container-location:
+	${CONTAINER_ENGINE} build -t ${LOCATION_SERVICE_IMAGE}:${LOCATION_SERVICE_TAG} -f Dockerfile.location .
+
+build-container-rhoai-normalizer:
+	${CONTAINER_ENGINE} build -t ${RHOAI_NORMALIZER_IMAGE}:${RHOAI_NORMALIZER_TAG} -f Dockerfile.rhoai-normalizer .
+
+build-container-storage-rest:
+	${CONTAINER_ENGINE} build -t ${STORAGE_REST_IMAGE}:${STORAGE_REST_TAG} -f Dockerfile.storage-rest .
+
+build-containers: build-container-location build-container-rhoai-normalizer build-container-storage-rest
