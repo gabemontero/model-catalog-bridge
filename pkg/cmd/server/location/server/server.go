@@ -73,7 +73,7 @@ func addRequestId() gin.HandlerFunc {
 }
 
 func (i *ImportLocationServer) loadFromStorage() (bool, error) {
-	rc, msg, err, keys := i.storage.ListModels()
+	rc, msg, err, keys := i.storage.ListModelsKeys()
 	if err != nil {
 		klog.Errorf("%s: %s", err.Error(), msg)
 		return false, nil
@@ -86,7 +86,7 @@ func (i *ImportLocationServer) loadFromStorage() (bool, error) {
 	for _, key := range keys {
 		segs := strings.Split(key, "_")
 		if len(segs) < 2 {
-			klog.Errorf("bad format for key from ListModels when splitting with '_': %s", key)
+			klog.Errorf("bad format for key from ListModelsKeys when splitting with '_': %s", key)
 			continue
 		}
 		il := &ImportLocation{}

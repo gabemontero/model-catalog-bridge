@@ -59,7 +59,7 @@ func (b *BridgeStorageRESTClient) PostCurrentKeySet(keys []string) (int, string,
 	return storageResp.StatusCode(), msg, nil
 }
 
-func (b *BridgeStorageRESTClient) ListModels() (int, string, error, []string) {
+func (b *BridgeStorageRESTClient) ListModelsKeys() (int, string, error, []string) {
 	var err error
 	var storageResp *resty.Response
 
