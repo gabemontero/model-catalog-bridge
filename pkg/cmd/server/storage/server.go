@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -47,6 +48,8 @@ func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgU
 	r.Use(addRequestId())
 	r.POST(util.UpsertURI, s.handleCatalogUpsertPost)
 	r.POST(util.CurrentKeySetURI, s.handleCatalogCurrentKeySetPost)
+	r.GET(util.ListURI, s.handleCatalogList)
+	r.GET(util.FetchURI, s.handleCatalogFetch)
 	return s
 }
 
@@ -83,12 +86,21 @@ func (s *StorageRESTServer) sync(key string) (*types.StorageBody, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	sb, ok := s.pushedLocations[key]
-	if ok {
+	if ok && sb.LocationIDValid {
 		return sb, nil
 	}
 	ssb, err := s.st.Fetch(key)
 	if err == nil && len(ssb.LocationId) > 0 {
-		s.pushedLocations[key] = &ssb
+		_, err = s.bkstg.GetLocation(ssb.LocationId)
+		if err == nil {
+			ssb.LocationIDValid = true
+			s.pushedLocations[key] = &ssb
+			//TODO do we bother updating the storage tier
+		} else {
+			klog.Infof("previously registered location %s:%s is no longer valid, unregistering", ssb.LocationId, ssb.LocationTarget)
+			delete(s.pushedLocations, key)
+			return &types.StorageBody{}, s.st.Remove(key)
+		}
 	}
 	return &ssb, err
 }
@@ -307,4 +319,49 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 	}
 
 	c.Status(http.StatusCreated)
+}
+
+type DiscoverResponse struct {
+	Keys []string `json:"keys"`
+}
+
+func (s *StorageRESTServer) handleCatalogList(c *gin.Context) {
+	var err error
+	d := &DiscoverResponse{}
+	d.Keys, err = s.st.List()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		msg := fmt.Sprintf("error listing location keys: %s", err.Error())
+		klog.Errorf(msg)
+		c.Error(fmt.Errorf(msg))
+		return
+	}
+	var content []byte
+	content, err = json.Marshal(d)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		c.Error(err)
+		return
+	}
+	c.Data(http.StatusOK, "Content-Type: application/json", content)
+}
+
+func (s *StorageRESTServer) handleCatalogFetch(c *gin.Context) {
+	key := c.Query("key")
+	if len(key) == 0 {
+		c.Status(http.StatusBadRequest)
+		c.Error(fmt.Errorf("need a 'key' parameter"))
+		return
+	}
+	var err error
+	sb := types.StorageBody{}
+	sb, err = s.st.Fetch(key)
+	var content []byte
+	content, err = json.Marshal(sb)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		c.Error(err)
+		return
+	}
+	c.Data(http.StatusOK, "Content-Type: application/json", content)
 }

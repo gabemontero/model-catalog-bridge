@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
@@ -13,6 +14,8 @@ type BridgeStorageRESTClient struct {
 	RESTClient       *resty.Client
 	UpsertURL        string
 	CurrentKeySetURL string
+	ListURL          string
+	FetchURL         string
 	Token            string
 }
 
@@ -21,6 +24,8 @@ func SetupBridgeStorageRESTClient(hostURL, token string) *BridgeStorageRESTClien
 		RESTClient:       resty.New(),
 		UpsertURL:        hostURL + util.UpsertURI,
 		CurrentKeySetURL: hostURL + util.CurrentKeySetURI,
+		ListURL:          hostURL + util.ListURI,
+		FetchURL:         hostURL + util.FetchURI,
 		Token:            token,
 	}
 	return b
@@ -52,4 +57,36 @@ func (b *BridgeStorageRESTClient) PostCurrentKeySet(keys []string) (int, string,
 	}
 
 	return storageResp.StatusCode(), msg, nil
+}
+
+func (b *BridgeStorageRESTClient) ListModels() (int, string, error, []string) {
+	var err error
+	var storageResp *resty.Response
+
+	storageResp, err = b.RESTClient.R().SetAuthToken(b.Token).SetHeader("Accept", "application/json").Get(b.ListURL)
+	msg := fmt.Sprintf("%#v", storageResp)
+	if err != nil {
+		return http.StatusInternalServerError, msg, err, []string{}
+	}
+
+	d := &DiscoverResponse{}
+	err = json.Unmarshal(storageResp.Body(), d)
+	if err != nil {
+		return http.StatusBadRequest, msg, err, []string{}
+	}
+
+	return storageResp.StatusCode(), msg, nil, d.Keys
+}
+
+func (b *BridgeStorageRESTClient) FetchModel(key string) (int, string, error, []byte) {
+	var err error
+	var storageResp *resty.Response
+
+	storageResp, err = b.RESTClient.R().SetAuthToken(b.Token).SetQueryParam(util.KeyQueryParam, key).SetHeader("Accept", "application/json").Get(b.FetchURL)
+	msg := fmt.Sprintf("%#v", storageResp)
+	if err != nil {
+		return http.StatusInternalServerError, msg, err, []byte{}
+	}
+
+	return storageResp.StatusCode(), msg, nil, storageResp.Body()
 }

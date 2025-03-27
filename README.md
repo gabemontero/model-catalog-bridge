@@ -46,7 +46,7 @@ Either via the command line, or from your favorite Golang editor, set the follow
 
 ### location
 
-1. None of the above env vars are needed at this time.
+1. `STORAGE_URL` is the same as above
 
 When you are ready to launch the 3 processes, set your current namespace to the `NAMESPACE` value:
 
