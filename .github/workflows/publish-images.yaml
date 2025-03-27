@@ -16,7 +16,7 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
           registry: quay.io
-      - name: Storage Rest meta
+      - name: RHOAI Normalizer meta
         id: meta-rhoai-normalizer
         uses: docker/metadata-action@v4
         with:
@@ -28,10 +28,10 @@ jobs:
       - name: Build & Push - RHOAI Normalizer Container Image
         uses: docker/build-push-action@v3
         with:
-          dockerfile: Dockerfile.rhoai-normalizer
+          file: Dockerfile.rhoai-normalizer
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.meta-rhoai-normalizer }}
+          tags: ${{ steps.meta-rhoai-normalizer.outputs.tags }}
       - name: Location Service meta
         id: meta-location
         uses: docker/metadata-action@v4
@@ -44,7 +44,7 @@ jobs:
       - name: Build & Push - Location Service Container Image
         uses: docker/build-push-action@v3
         with:
-          dockerfile: Dockerfile.location
+          file: Dockerfile.location
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta-location.outputs.tags }}
@@ -60,7 +60,7 @@ jobs:
       - name: Build & Push - Storage Rest Container Image
         uses: docker/build-push-action@v3
         with:
-          dockerfile: Dockerfile.storage-rest
+          file: Dockerfile.storage-rest
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta-storage-rest.outputs.tags }}
