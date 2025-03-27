@@ -16,13 +16,22 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
           registry: quay.io
+      - name: Storage Rest meta
+        id: meta-rhoai-normalizer
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer
+          tags: |
+            latest
+            type=sha
       - name: Build & Push - RHOAI Normalizer Container Image
         uses: docker/build-push-action@v3
         with:
           dockerfile: Dockerfile.rhoai-normalizer
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.meta-rhoai-normalizer }}
       - name: Location Service meta
         id: meta-location
         uses: docker/metadata-action@v4
