@@ -64,3 +64,13 @@ jobs:
             git --no-pager diff
             exit 1
           fi
+
+  build-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Build Container Images
+        run: |
+          make build-containers

@@ -1,0 +1,57 @@
+name: Publish Container Images
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  publish-container-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+      - name: Login to Quay.io
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+          registry: quay.io
+      - name: Build & Push - RHOAI Normalizer Container Image
+        uses: docker/build-push-action@v3
+        with:
+          dockerfile: Dockerfile.rhoai-normalizer
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+      - name: Location Service meta
+        id: meta-location
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            quay.io/redhat-ai-dev/model-catalog-location-service
+          tags: |
+            latest
+            type=sha
+      - name: Build & Push - Location Service Container Image
+        uses: docker/build-push-action@v3
+        with:
+          dockerfile: Dockerfile.location
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-location.outputs.tags }}
+      - name: Storage Rest meta
+        id: meta-storage-rest
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            quay.io/redhat-ai-dev/model-catalog-storage-rest
+          tags: |
+            latest
+            type=sha
+      - name: Build & Push - Storage Rest Container Image
+        uses: docker/build-push-action@v3
+        with:
+          dockerfile: Dockerfile.storage-rest
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-storage-rest.outputs.tags }}
