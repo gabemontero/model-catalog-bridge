@@ -24,6 +24,12 @@ Rather, visit the team's [RHDHPAI Jira project and the 'model-registry-bridge' c
    - on AWS `m6i.2xlarge` or `g5.2xlarge` (if GPUs are needed) work well
    - For other options, see https://aws.amazon.com/ec2/instance-types/
 
+## Model Catalog Schema
+
+The schema that the model catalog bridge will use to collect model and model server metadata can be found under [schema/](./schema/).
+
+To re-generate the types that correspond to the schema, run `make generate-types-all`.
+
 ## Usage
 
 Either via the command line, or from your favorite Golang editor, set the following environment variables as follows
@@ -80,8 +86,86 @@ spec:
     namespace: istio-system
 ```
 
-## Model Catalog Schema
+### Running as a RHDH Sidecar
 
-The schema that the model catalog bridge will use to collect model and model server metadata can be found under [schema/](./schema/).
+**NOTE** this is intended for local development use only at this time.
 
-To re-generate the types that correspond to the schema, run `make generate-types-all`.
+The [sidecar](./assets/sidecar-after-ai-rhdh-installer) folder as a working set of YAML files that can be used the augment the configuration in the `ai-rhdh` namespace that is set up by the 
+RHDHPAP team's [ai-rhdh-installer](https://github.com/redhat-ai-dev/ai-rhdh-installer).
+
+The steps involved **AFTER** running the 'ai-rhdh-installer' are as follows:
+
+- from the root of this repository, run `oc apply -f ./assets/sidecar-after-ai-rhdh-installer/k8s-sa-for-bridge.yaml` to set up the various ServiceAccounts, Secrets, RBAC, for the bridge to run as a set of 3 sidecar containers within the RHDH Pod.
+- next, a list of hosts allowed to update the Backstage Catalog, and a static token for accessing the Backstage backend needs to be defined and set up; this is done in 2 parts.
+- part one, the `ai-rh-developer-hub-env` Secret needs to be updated via say `oc edit` to include and `RHDH_TOKEN` key with a base 64 encoded randomly generated value; an YAML snippet for this exists in [this YAML file](assets/sidecar-after-ai-rhdh-installer/developer-hub-app-config-patches.yaml).
+- this will force a restart of the RHDH pod; run `oc get pods -w` to see the old `backstage-ai-rh-developer-hub...` shut down and the new Pod spin up
+- part two, the `app-config.extra.yaml` key in the `developer-hub-app-config` ConfigMap needs to be updated to include the new `RHDH_TOKEN` and the allowed hosts in the Backstage config
+- if you look at the following bracketed section in [this YAML file](assets/sidecar-after-ai-rhdh-installer/developer-hub-app-config-patches.yaml) 
+
+```yaml
+    # start of delta from ai-rhdh-installer
+    backend:
+      auth:
+        externalAccess:
+          - type: static
+            options:
+              token: ${RHDH_TOKEN}
+              subject: admin-curl-access
+      reading:
+        allow:
+          - host: example.com
+          - host: '*.mozilla.org'
+          - host: '*.openshift.com'
+          - host: '*.openshiftapps.com'
+          - host: '10.*:9090'
+          - host: '127.0.0.1:9090'
+          - host: '127.0.0.1:8080'
+          - host: '127.0.0.1:7070'
+          - host: 'localhost:9090'
+          - host: 'localhost:8080'
+          - host: 'localhost:7070'
+    # end of delta from ai-rhdh-installer
+```
+
+- while running `oc edit cm developer-hub-app-config` you will want to copy/paste that section after:
+
+```yaml
+    auth:
+      environment: production
+      providers:
+        github:
+          production:
+            clientId: ${GITHUB__APP__CLIENT__ID}
+            clientSecret: ${GITHUB__APP__CLIENT__SECRET}
+```
+
+- and before:
+
+```yaml
+    dangerouslyAllowSignInWithoutUserInCatalog: false
+```
+
+- the RHDH Pod will again recycle; watch for that to complete.
+- lastly, we are now ready to update the `Backstage` CR instance with the new setting to include the 3 sidecar containers; again, a complicated patch, which we'll employ `oc edit backstage` from the `ai-rhdh` namespace.
+- first, under `spec.application`, after the `extraEnvs:` line, paste from [./assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml](assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml) the following:
+
+```yaml
+    extraFiles:
+      secrets:
+        - name: rhdh-rhoai-bridge-token
+          mountPath: /opt/app-root/src
+          key: token
+```
+
+- then, replace the entire `deployment` section, which should look something like this:
+
+```yaml
+  deployment:
+    patch:
+      spec:
+        replicas: 1
+```
+
+- with the entire `deployment` section from [./assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml](assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml)
+- watch the `backstage-ai-rh-developer-hub...` Pod recycle (the new Pod will now have 4 containers, including the bridge's `location`, `storage-rest`, and `rhoai-normalizer` containers)
+- after RHDH Pod restart has completed successfully, once models are defined in the ODH/RHOAI model registry, you'll see the `bac-import-model` ConfigMap populated with entries for those models 

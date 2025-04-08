@@ -2,11 +2,13 @@ package main
 
 import (
 	goflag "flag"
+	"fmt"
 	gin_gonic_http_srv "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/location/server"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"k8s.io/klog/v2"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -14,8 +16,20 @@ func main() {
 	klog.InitFlags(flagset)
 
 	st := os.Getenv("STORAGE_URL")
+	rr := strings.NewReplacer("\r", "", "\n", "")
+	st = rr.Replace(st)
+	if len(st) == 0 {
+		// try our RHDH sidecar container hack
+		podIP := os.Getenv("POD_IP")
+		st = fmt.Sprintf("http://%s:7070", podIP)
+		klog.Infof("using %s for the storage URL per our sidecar hack", st)
+	}
 	nfstr := os.Getenv(types.FormatEnvVar)
+	nfstr = rr.Replace(nfstr)
 	nf := types.NormalizerFormat(nfstr)
+	if len(nfstr) == 0 {
+		nf = types.JsonArrayForamt
+	}
 	server := gin_gonic_http_srv.NewImportLocationServer(st, nf)
 	stopCh := util.SetupSignalHandler()
 	server.Run(stopCh)
