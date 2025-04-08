@@ -3,6 +3,8 @@ package kubeflowmodelregistry
 import (
 	"bufio"
 	"bytes"
+	"testing"
+
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
@@ -13,7 +15,6 @@ import (
 	"knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 )
 
 func TestLoopOverKRMR_JsonArray(t *testing.T) {
@@ -122,7 +123,7 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 }
 
 const (
-	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}],"modelServer":{"API":{"spec":"","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v1/8c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}}`
+	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}],"modelServer":{"API":{"spec":"","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v1/8c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}}`
 	jsonListWithInferenceOutputYAML = `modelServer:
   API:
     spec: ""
@@ -143,7 +144,7 @@ models:
   owner: rhdh-rhoai-bridge
   tags:
   - _lastModified`
-	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}]}`
+	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}]}`
 	jsonListOutputYAML = `models:
 - artifactLocationURL: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx
   description: ""

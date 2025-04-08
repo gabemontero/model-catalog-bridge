@@ -3,6 +3,9 @@ package kubeflowmodelregistry
 import (
 	"context"
 	"fmt"
+	"io"
+	"regexp"
+
 	serverv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kubeflow/model-registry/pkg/openapi"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
@@ -10,11 +13,9 @@ import (
 	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
-	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -226,7 +227,7 @@ type ModelPopulator struct {
 func (m *ModelPopulator) GetName() string {
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
-		return mv.GetName()
+		return m.RegisteredModel.Name + "-" + mv.GetName()
 	}
 	return ""
 }
