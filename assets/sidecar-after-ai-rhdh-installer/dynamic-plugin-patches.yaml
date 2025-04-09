@@ -1,0 +1,19 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  # There will be a pre-existing dynamic plugins already present if you followed the installer
+  # in which case, modify the existing configmap to add the plugin entry in
+  name: backstage-ai-rh-developer-hub-dynamic-plugins-3c140ae5afb4
+  labels:
+    rhdh.redhat.com/ext-config-sync: 'true'
+  annotations:
+    rhdh.redhat.com/backstage-name: developer-hub
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    # The following specifies that the model catalog plugin (red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog)
+    # contained within the OCI archive (quay.io/redhat-ai-dev/ai-integrations-rhdh:latest) should be installed into RHDH
+    plugins:
+      - package: oci://quay.io/redhat-ai-dev/ai-integrations-rhdh:latest!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog
+        disabled: false
