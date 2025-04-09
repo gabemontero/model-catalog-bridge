@@ -86,6 +86,11 @@
                 "usage": {
                     "description": "How to use and interact with the model server",
                     "type": "string"
+                },
+                "annotations": {
+                    "description": "Annotations relating to the model server, in key-value pair format",
+                    "type": "object",
+                    "additionalProperties": {"type": "string"}
                 }
             },
             "additionalProperties": false,
@@ -191,6 +196,11 @@
                 "usage": {
                     "description": "How to use and interact with the model",
                     "type": "string"
+                },
+                "annotations": {
+                    "description": "Annotations relating to the model, in key-value pair format",
+                    "type": "object",
+                    "additionalProperties": {"type": "string"}
                 }
             },
             "additionalProperties": false
