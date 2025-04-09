@@ -74,8 +74,6 @@ spec:
                     value: JsonArrayFormat
                   - name: STORAGE_TYPE
                     value: ConfigMap
-                  - name: BKSTG_URL
-                    value: https://backstage-ai-rh-developer-hub-ai-rhdh.apps.gmontero416.devcluster.openshift.com
                   - name: POD_IP
                     valueFrom:
                       fieldRef:
@@ -105,8 +103,6 @@ spec:
                     value: JsonArrayFormat
                   - name: MR_ROUTE
                     value: odh-model-registries-modelregistry-public-rest
-                  - name: BKSTG_URL
-                    value: https://backstage-ai-rh-developer-hub-ai-rhdh.apps.gmontero416.devcluster.openshift.com
                   - name: POD_IP
                     valueFrom:
                       fieldRef:
