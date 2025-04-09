@@ -69,6 +69,10 @@ export interface ModelServer {
  */
 export interface API {
     /**
+     * Annotations relating to the model, in key-value pair format
+     */
+    annotations?: { [key: string]: string };
+    /**
      * A link to the schema used by the model server API
      */
     spec: string;

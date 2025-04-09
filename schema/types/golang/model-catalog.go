@@ -58,15 +58,17 @@ type ModelServer struct {
 // Schema for defining the API exposed by model servers, for conversion to Backstage catalog
 // entities
 type API struct {
-	// A link to the schema used by the model server API                                                 
-	Spec                                                                                        string   `json:"spec"`
-	// Descriptive tags for the model server's API                                                       
-	Tags                                                                                        []string `json:"tags,omitempty"`
-	// The type of API that the model server exposes                                                     
-	Type                                                                                        Type     `json:"type"`
-	// The URL that the model server's REST API is exposed over, how the model(s) are interacted         
-	// with                                                                                              
-	URL                                                                                         string   `json:"url"`
+	// Annotations relating to the model, in key-value pair format                                                
+	Annotations                                                                                 map[string]string `json:"annotations,omitempty"`
+	// A link to the schema used by the model server API                                                          
+	Spec                                                                                        string            `json:"spec"`
+	// Descriptive tags for the model server's API                                                                
+	Tags                                                                                        []string          `json:"tags,omitempty"`
+	// The type of API that the model server exposes                                                              
+	Type                                                                                        Type              `json:"type"`
+	// The URL that the model server's REST API is exposed over, how the model(s) are interacted                  
+	// with                                                                                                       
+	URL                                                                                         string            `json:"url"`
 }
 
 // An AI model to be imported into the Backstage catalog
