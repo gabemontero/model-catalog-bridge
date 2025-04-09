@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -11,8 +12,12 @@ import (
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8srest "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"net/http"
+	"os"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"strings"
 	"sync"
 )
@@ -24,26 +29,23 @@ type StorageRESTServer struct {
 	pushedLocations map[string]*types.StorageBody
 	locations       *bridgeclient.BridgeLocationRESTClient
 	bkstg           rest.BackstageImport
+	bkstgToken      string
 	format          types.NormalizerFormat
 }
 
-func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgURL, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
+func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	cfg := &config.Config{
-		BackstageURL:     bkstgURL,
-		BackstageToken:   bkstgToken,
-		BackstageSkipTLS: true,
-	}
 	s := &StorageRESTServer{
 		router:          r,
 		st:              st,
 		mutex:           sync.Mutex{},
 		pushedLocations: map[string]*types.StorageBody{},
 		locations:       bridgeclient.SetupBridgeLocationRESTClient(bridgeURL, bridgeToken),
-		bkstg:           backstage.SetupBackstageRESTClient(cfg),
+		bkstgToken:      bkstgToken,
 		format:          nf,
 	}
+	s.setupBkstg()
 	klog.Infof("NewStorageRESTServer")
 	r.SetTrustedProxies(nil)
 	r.TrustedPlatform = "X-Forwarded-For"
@@ -173,7 +175,11 @@ func (s *StorageRESTServer) handleCatalogCurrentKeySetPost(c *gin.Context) {
 
 			s.del(k)
 			//TODO provisional direct delete of location
-			if len(sb.LocationId) > 0 {
+			bkstAvailable := s.setupBkstg()
+			if !bkstAvailable && len(sb.LocationId) > 0 {
+				klog.Warningf("Access to Backstage is not available so will not delete location %s", sb.LocationId)
+			}
+			if len(sb.LocationId) > 0 && bkstAvailable {
 				msg, err = s.bkstg.DeleteLocation(sb.LocationId)
 				if err == nil {
 					klog.Infof("deletion of location %s for target %s successful", sb.LocationId, sb.LocationTarget)
@@ -289,27 +295,33 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 	}
 
 	impResp := map[string]any{}
-	impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
-		klog.Errorf(msg)
-		c.Error(fmt.Errorf(msg))
-		return
-	}
-	retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
-	if !rok {
-		//TODO perhaps delete location on the backstage side as well as our cache
-		c.Status(http.StatusBadRequest)
-		msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
-		klog.Errorf(msg)
-		c.Error(fmt.Errorf(msg))
-		return
-	}
+	bkstAvailable := s.setupBkstg()
+	if !bkstAvailable {
+		klog.Warningf("Access to Backstage is not available so will not delete location %s", sb.LocationId)
+	} else {
+		impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
+			klog.Errorf(msg)
+			c.Error(fmt.Errorf(msg))
+			return
+		}
+		retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
+		if !rok {
+			//TODO perhaps delete location on the backstage side as well as our cache
+			c.Status(http.StatusBadRequest)
+			msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
+			klog.Errorf(msg)
+			c.Error(fmt.Errorf(msg))
+			return
+		}
 
+		sb.LocationId = retID
+		sb.LocationTarget = retTarget
+
+	}
 	// finally store in our storage layer with the id and cross reference location URL from backstage
-	sb.LocationId = retID
-	sb.LocationTarget = retTarget
 	err = s.st.Upsert(key, *sb)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -366,4 +378,66 @@ func (s *StorageRESTServer) handleCatalogFetch(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "Content-Type: application/json", content)
+}
+
+func GetRESTConfig() (*k8srest.Config, error) {
+	restConfig, err := util.InClusterConfigHackForRHDHSidecars()
+	if restConfig == nil || err != nil {
+		cfg := &config.Config{}
+		restConfig, err = util.GetK8sConfig(cfg)
+		if restConfig == nil || err != nil {
+			restConfig = ctrl.GetConfigOrDie()
+		}
+	}
+	return restConfig, err
+}
+
+func GetBackstageURL(restConfig *k8srest.Config) string {
+	r := strings.NewReplacer("\r", "", "\n", "")
+	bkstgURL := os.Getenv("BKSTG_URL")
+	bkstgURL = r.Replace(bkstgURL)
+	if len(bkstgURL) == 0 {
+		routeClient := util.GetRouteClient(restConfig)
+		ns := os.Getenv("POD_NAMESPACE")
+		ns = r.Replace(ns)
+		routes, err := routeClient.Routes(ns).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("error getting backstage route (will try again later): %s", err.Error())
+			return ""
+		}
+		if len(routes.Items) > 0 {
+			// doing label selectors where the key has '\' proved too complicated
+			for _, route := range routes.Items {
+				v, ok := route.Labels["app.kubernetes.io/name"]
+				if ok && strings.Contains(v, "backstage") {
+					bkstgURL = fmt.Sprintf("https://%s", route.Spec.Host)
+				}
+			}
+		}
+	}
+	klog.Infof("bkstg URL %s", bkstgURL)
+	return bkstgURL
+}
+
+func (s *StorageRESTServer) setupBkstg() bool {
+	if s.bkstg != nil {
+		return true
+	}
+	restConfig, err := GetRESTConfig()
+	if err != nil {
+		klog.Errorf("%s", err.Error())
+		return false
+	}
+	bkstgURL := GetBackstageURL(restConfig)
+	if len(bkstgURL) > 0 {
+		cfg := &config.Config{
+			BackstageURL:   bkstgURL,
+			BackstageToken: s.bkstgToken,
+			// this will be overriden by SetupBackstageRESTClient if a ca.crt is found
+			BackstageSkipTLS: true,
+		}
+		s.bkstg = backstage.SetupBackstageRESTClient(cfg)
+		return true
+	}
+	return false
 }

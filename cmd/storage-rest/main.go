@@ -4,7 +4,6 @@ import (
 	goflag "flag"
 	"fmt"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"k8s.io/klog/v2"
@@ -21,23 +20,21 @@ func main() {
 
 	bs := storage.NewBridgeStorage(storageType)
 
-	// setup ca.crt for TLS
-	util.InClusterConfigHackForRHDHSidecars()
+	// setup ca.crt for TLS, get k8s cfg to find bkstg route
+	restConfig, err := storage.GetRESTConfig()
+	if err != nil {
+		klog.Errorf("%s", err.Error())
+		klog.Flush()
+		os.Exit(1)
+	}
 
 	r := strings.NewReplacer("\r", "", "\n", "")
 
 	//TODO maybe change to LOCATION_URL
 	bridgeURL := os.Getenv("BRIDGE_URL")
 	bridgeURL = r.Replace(bridgeURL)
-	cfg := &config.Config{}
-	restCfg, err := util.GetK8sConfig(cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s", err.Error())
-		os.Exit(1)
-	}
-	bridgeToken := util.GetCurrentToken(restCfg)
-	bkstgURL := os.Getenv("BKSTG_URL")
-	bkstgURL = r.Replace(bkstgURL)
+	bridgeToken := util.GetCurrentToken(restConfig)
+
 	bkstgToken := os.Getenv("RHDH_TOKEN")
 	bkstgToken = r.Replace(bkstgToken)
 
@@ -52,7 +49,7 @@ func main() {
 	nfstr := os.Getenv(types.FormatEnvVar)
 	nf := types.NormalizerFormat(nfstr)
 
-	server := storage.NewStorageRESTServer(bs, bridgeURL, bridgeToken, bkstgURL, bkstgToken, nf)
+	server := storage.NewStorageRESTServer(bs, bridgeURL, bridgeToken, bkstgToken, nf)
 	stopCh := util.SetupSignalHandler()
 	server.Run(stopCh)
 
