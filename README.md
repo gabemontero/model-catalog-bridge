@@ -169,3 +169,19 @@ The steps involved **AFTER** running the 'ai-rhdh-installer' are as follows:
 - with the entire `deployment` section from [./assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml](assets/sidecar-after-ai-rhdh-installer/backstage-cr.yaml)
 - watch the `backstage-ai-rh-developer-hub...` Pod recycle (the new Pod will now have 4 containers, including the bridge's `location`, `storage-rest`, and `rhoai-normalizer` containers)
 - after RHDH Pod restart has completed successfully, once models are defined in the ODH/RHOAI model registry, you'll see the `bac-import-model` ConfigMap populated with entries for those models 
+
+### Deploying the Model Catalog RHDH Plugin
+
+If you wish to run the Model Catalog plugin in a remote instance of RHDH, the steps are as follows:
+
+- If your Backstage custom resource already has a dynamic plugins configmap listed under `spec.application.dynamicPluginsConfigMapName`, modify the ConfigMap to add the following entry under `dynamic-plugins.yaml`:
+
+```
+    plugins:
+      - package: oci://quay.io/redhat-ai-dev/ai-integrations-rhdh:latest!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog
+        disabled: false
+```
+
+- If you do not have a ConfigMap listed under `spec.application.dynamicPluginsConfigMapName`, then you may use [./assets/sidecar-after-ai-rhdh-installer/dynamic-plugin-patches.yaml](./assets/sidecar-after-ai-rhdh-installer/dynamic-plugin-patches.yaml) as a reference point. 
+
+    - After the ConfigMap has been created, modify the Backstage CR to specify the ConfigMap name under `spec.application.dynamicPluginsConfigMapName`
