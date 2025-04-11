@@ -24,15 +24,17 @@ const (
 
 	// pulled from makeValidator.ts in the catalog-model package in core backstage
 	tagRegexp = "^[a-z0-9:+#]+(\\-[a-z0-9:+#]+)*$"
+
+	nameInvalidCharRegexp = `[^a-zA-Z0-9\-_.]`
+
+	nameNoDuplicateSpecialCharRegexp = `[-_.]{2,}`
 )
 
-func LoopOverKFMR(owner, lifecycle string, ids []string, writer io.Writer, format brdgtypes.NormalizerFormat, kfmr *KubeFlowRESTClientWrapper, client client.Client) ([]openapi.RegisteredModel, map[string][]openapi.ModelVersion, error) {
+func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.RegisteredModel, map[string][]openapi.ModelVersion, map[string]map[string][]openapi.ModelArtifact, error) {
 	var err error
-	var isl []openapi.InferenceService
 	rmArray := []openapi.RegisteredModel{}
 	mvsMap := map[string][]openapi.ModelVersion{}
-
-	isl, err = kfmr.ListInferenceServices()
+	masMap := map[string]map[string][]openapi.ModelArtifact{}
 
 	if len(ids) == 0 {
 		var rms []openapi.RegisteredModel
@@ -40,7 +42,7 @@ func LoopOverKFMR(owner, lifecycle string, ids []string, writer io.Writer, forma
 		if err != nil {
 			klog.Errorf("list registered models error: %s", err.Error())
 			klog.Flush()
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		for _, rm := range rms {
 			if rm.State != nil && *rm.State == openapi.REGISTEREDMODELSTATE_ARCHIVED {
@@ -53,16 +55,12 @@ func LoopOverKFMR(owner, lifecycle string, ids []string, writer io.Writer, forma
 			if err != nil {
 				klog.Errorf("%s", err.Error())
 				klog.Flush()
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
-			err = CallBackstagePrinters(owner, lifecycle, &rm, mvs, mas, isl, nil, kfmr, client, writer, format)
-			if err != nil {
-				klog.Errorf("print model catalog: %s", err.Error())
-				klog.Flush()
-				return nil, nil, err
-			}
+
 			rmArray = append(rmArray, rm)
 			mvsMap[rm.Name] = mvs
+			masMap[rm.Name] = mas
 		}
 	} else {
 		for _, id := range ids {
@@ -71,7 +69,7 @@ func LoopOverKFMR(owner, lifecycle string, ids []string, writer io.Writer, forma
 			if err != nil {
 				klog.Errorf("get registered model error for %s: %s", id, err.Error())
 				klog.Flush()
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if rm.State != nil && *rm.State == openapi.REGISTEREDMODELSTATE_ARCHIVED {
 				klog.V(4).Infof("LoopOverKFMR skipping archived registered model %s", rm.Name)
@@ -83,14 +81,14 @@ func LoopOverKFMR(owner, lifecycle string, ids []string, writer io.Writer, forma
 			if err != nil {
 				klog.Errorf("get model version/artifact error for %s: %s", id, err.Error())
 				klog.Flush()
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
-			err = CallBackstagePrinters(owner, lifecycle, rm, mvs, mas, isl, nil, kfmr, client, writer, format)
 			rmArray = append(rmArray, *rm)
 			mvsMap[rm.Name] = mvs
+			masMap[rm.Name] = mas
 		}
 	}
-	return rmArray, mvsMap, nil
+	return rmArray, mvsMap, masMap, nil
 }
 
 func callKubeflowREST(id string, kfmr *KubeFlowRESTClientWrapper) (mvs []openapi.ModelVersion, ma map[string][]openapi.ModelArtifact, err error) {
@@ -173,12 +171,18 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 	maIndex := 0
 
 	kfmrIS := openapi.InferenceService{}
+	foundInferenceService := false
 	for isidx, is := range m.InferenceServices {
 		if is.RegisteredModelId == m.RegisteredModel.GetId() {
 			infSvcIdx = isidx
 			kfmrIS = is
+			foundInferenceService = true
 			break
 		}
+	}
+
+	if !foundInferenceService {
+		return nil
 	}
 
 	mas := []openapi.ModelArtifact{}
@@ -352,11 +356,11 @@ func sanitizeName(name string) string {
 	sanitizedName := name
 
 	// Replace any invalid characters with an empty character
-	validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+	validChars := regexp.MustCompile(nameInvalidCharRegexp)
 	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
 
 	// Remove duplicated special characters
-	noDupeChars := regexp.MustCompile(`[-_.]{2,}`)
+	noDupeChars := regexp.MustCompile(nameNoDuplicateSpecialCharRegexp)
 	sanitizedName = noDupeChars.ReplaceAllString(sanitizedName, "")
 
 	// Trim to no more than 63 characters
@@ -425,7 +429,8 @@ type ModelServerAPIPopulator struct {
 
 func (m *ModelServerAPIPopulator) GetSpec() string {
 	//TODO need to specify a well known k/v pair
-	return ""
+	// that said, Backstage complains if this is an empty string
+	return "TBD"
 }
 
 func (m *ModelServerAPIPopulator) GetTags() []string {

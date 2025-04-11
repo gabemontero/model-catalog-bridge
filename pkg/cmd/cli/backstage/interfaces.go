@@ -56,7 +56,7 @@ func PrintModelCatalogPopulator(svrPop ModelCatalogPopulator, writer io.Writer) 
 	}
 	ms := svrPop.GetModelServer()
 	// only add the model server if it has an inference endpoint URL
-	if ms.API != nil && len(ms.API.URL) > 0 {
+	if ms != nil && ms.API != nil && len(ms.API.URL) > 0 {
 		modelCatalog.ModelServer = ms
 	}
 	err := util.PrintJSON(modelCatalog, writer)

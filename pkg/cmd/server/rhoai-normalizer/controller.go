@@ -361,24 +361,22 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 					if se.Name != nil && *se.Name == is.Namespace {
 						// FOUND the match !!
 						// reminder based on explanations about model artifact actually being the "root" of their model, and what has been observed in testing,
-						// the ID for the registered model and model artifact appear to match
-						maId := *rm.Id
 						mvId := kfmrIS.GetModelVersionId()
-						var ma *openapi.ModelArtifact
+						var mas []openapi.ModelArtifact
 						var mv *openapi.ModelVersion
 						mv, err = r.kfmr.GetModelVersions(mvId)
 						if err != nil {
 							log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error getting kfmr model version %s", name.String(), mvId))
 							// don't just continue, try to build a catalog entry with the subset of info available
 						}
-						ma, err = r.kfmr.GetModelArtifact(maId)
+						mas, err = r.kfmr.ListModelArtifacts(mvId)
 						if err != nil {
-							log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error getting kfmr model version %s", name.String(), mvId))
+							log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error getting kfmr model artifacts for %s", name.String(), mvId))
 							// don't just continue, try to build a catalog entry with the subset of info available
 						}
 
-						if mv == nil || ma == nil {
-							log.Info(fmt.Sprintf("either mv %#v or ma %#v is nil, bypassing CallBackstagePrinters", mv, ma))
+						if mv == nil || mas == nil {
+							log.Info(fmt.Sprintf("either mv %#v or mas %#v is nil, bypassing CallBackstagePrinters", mv, mas))
 							continue
 						}
 
@@ -388,7 +386,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							&rm,
 							//TODO deal with multiple versions
 							[]openapi.ModelVersion{*mv},
-							map[string][]openapi.ModelArtifact{mvId: {*ma}},
+							map[string][]openapi.ModelArtifact{mvId: mas},
 							[]openapi.InferenceService{kfmrIS},
 							is,
 							r.kfmr,
@@ -424,10 +422,7 @@ func (r *RHOAINormalizerReconcile) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-eventTicker.C:
-			b := []byte{}
-			buf := bytes.NewBuffer(b)
-			bwriter := bufio.NewWriter(buf)
-			r.innerStart(ctx, buf, bwriter)
+			r.innerStart(ctx, nil, nil)
 
 		case <-ctx.Done():
 		}
@@ -443,9 +438,11 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 	var err error
 	var rms []openapi.RegisteredModel
 	var mvs map[string][]openapi.ModelVersion
+	var mas map[string]map[string][]openapi.ModelArtifact
+	var isl []openapi.InferenceService
 
 	//TODO what do we do with owner/lifecycle when we poll
-	rms, mvs, err = kubeflowmodelregistry.LoopOverKFMR(util.DefaultOwner, util.DefaultLifecycle, []string{}, bwriter, r.format, r.kfmr, r.client)
+	rms, mvs, mas, err = kubeflowmodelregistry.LoopOverKFMR([]string{}, r.kfmr)
 	if err != nil {
 		controllerLog.Error(err, "err looping over KFMR")
 		return
@@ -456,11 +453,32 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 		if !ok {
 			continue
 		}
+		maa, ok2 := mas[rm.Name]
+		if !ok2 {
+			continue
+		}
 		for _, mv := range mva {
 
 			importKey, _ := util.BuildImportKeyAndURI(rm.Name, mv.Name, r.format)
 			keys = append(keys, importKey)
-			err = r.processBWriter(bwriter, buf, importKey)
+			eb := []byte{}
+			ebuf := bytes.NewBuffer(eb)
+			ewriter := bufio.NewWriter(ebuf)
+			if buf != nil && bwriter != nil {
+				ebuf = buf
+				ewriter = bwriter
+			}
+			isl, err = r.kfmr.ListInferenceServices()
+			if err != nil {
+				controllerLog.Error(err, "error listing kubeflow inference services")
+				continue
+			}
+			err = kubeflowmodelregistry.CallBackstagePrinters(util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, nil, r.kfmr, r.client, ewriter, r.format)
+			if err != nil {
+				controllerLog.Error(err, "error processing calling backstage printer")
+				continue
+			}
+			err = r.processBWriter(ewriter, ebuf, importKey)
 			if err != nil {
 				controllerLog.Error(err, "error processing KFMR writer")
 				continue

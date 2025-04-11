@@ -28,16 +28,12 @@ func PrintYaml(obj interface{}, addDivider bool, w io.Writer) error {
 }
 
 func PrintJSON(obj interface{}, w io.Writer) error {
-	writer := printers.GetNewTabWriter(w)
 	output, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
-	_, err = writer.Write(output)
-	if err != nil {
-		return err
-	}
-	return writer.Flush()
+	_, err = w.Write(output)
+	return err
 }
 
 var (

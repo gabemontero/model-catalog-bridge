@@ -294,31 +294,33 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		return
 	}
 
-	impResp := map[string]any{}
+	//impResp := map[string]any{}
 	bkstAvailable := s.setupBkstg()
 	if !bkstAvailable {
-		klog.Warningf("Access to Backstage is not available so will not delete location %s", sb.LocationId)
+		klog.Warningf("Access to Backstage is not available so will not import location %s", sb.LocationId)
 	} else {
-		impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
-			klog.Errorf(msg)
-			c.Error(fmt.Errorf(msg))
-			return
-		}
-		retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
-		if !rok {
-			//TODO perhaps delete location on the backstage side as well as our cache
-			c.Status(http.StatusBadRequest)
-			msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
-			klog.Errorf(msg)
-			c.Error(fmt.Errorf(msg))
-			return
-		}
+		//TODO temp disable while we sort out adding the rhdh-rhoai-bridge type to backstage when running in RHDH
 
-		sb.LocationId = retID
-		sb.LocationTarget = retTarget
+		//impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
+		//if err != nil {
+		//	c.Status(http.StatusInternalServerError)
+		//	msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
+		//	klog.Errorf(msg)
+		//	c.Error(fmt.Errorf(msg))
+		//	return
+		//}
+		//retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
+		//if !rok {
+		//	//TODO perhaps delete location on the backstage side as well as our cache
+		//	c.Status(http.StatusBadRequest)
+		//	msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
+		//	klog.Errorf(msg)
+		//	c.Error(fmt.Errorf(msg))
+		//	return
+		//}
+		//
+		//sb.LocationId = retID
+		//sb.LocationTarget = retTarget
 
 	}
 	// finally store in our storage layer with the id and cross reference location URL from backstage
