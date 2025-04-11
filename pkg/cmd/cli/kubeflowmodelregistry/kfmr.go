@@ -351,7 +351,7 @@ func (m *ModelServerPopulator) GetName() string {
 func sanitizeName(name string) string {
 	sanitizedName := name
 
-	// Replace any invalid characters with an empty space
+	// Replace any invalid characters with an empty character
 	validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
 	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
 
