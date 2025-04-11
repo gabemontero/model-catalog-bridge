@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 
 	serverv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kubeflow/model-registry/pkg/openapi"
@@ -339,7 +340,20 @@ func (m *ModelServerPopulator) GetAuthentication() *bool {
 
 func (m *ModelServerPopulator) GetName() string {
 	if len(m.InferenceServices) > m.InfSvcIndex {
-		return m.InferenceServices[m.InfSvcIndex].GetName()
+		msName := m.InferenceServices[m.InfSvcIndex].GetName()
+
+		// Strip out any invalid characters
+		validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+		msName = validChars.ReplaceAllString(msName, "")
+
+		// Trim to 63 characters if it's over the maximum length
+		if len(msName) > 63 {
+			msName = msName[:63]
+		}
+
+		// Ensure only alphanumeric characters at beginning and end of the name
+		msName = strings.TrimRight(msName, "-_.")
+		return msName
 	}
 	return ""
 }

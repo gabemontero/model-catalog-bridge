@@ -123,7 +123,7 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 }
 
 const (
-	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}],"modelServer":{"API":{"spec":"","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v1/8c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}}`
+	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}],"modelServer":{"API":{"spec":"","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}}`
 	jsonListWithInferenceOutputYAML = `modelServer:
   API:
     spec: ""
