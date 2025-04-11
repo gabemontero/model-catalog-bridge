@@ -3,6 +3,7 @@ package kubeflowmodelregistry
 import (
 	"bufio"
 	"bytes"
+	"strings"
 	"testing"
 
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
@@ -120,6 +121,57 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 
 	}
 
+}
+
+func TestSanitizeName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Basic inference name",
+			input:    "InferenceServer123",
+			expected: "InferenceServer123",
+		},
+		{
+			name:     "Name with valid special characters",
+			input:    "Inference_Server123",
+			expected: "Inference_Server123",
+		},
+		{
+			name:     "Name with invalid characters",
+			input:    "Inference_Server#$Test",
+			expected: "Inference_ServerTest",
+		},
+		{
+			name:     "Name with beginning and ending invalid characters",
+			input:    ".-ValidName-_.",
+			expected: "ValidName",
+		},
+		{
+			name:     "Name with beginning and ending invalid characters",
+			input:    "Test-Name--Tester",
+			expected: "Test-NameTester",
+		},
+		{
+			name:     "Valid name with length greater than 63",
+			input:    "InferenceServer" + strings.Repeat("b", 64) + "test",
+			expected: "InferenceServer" + strings.Repeat("b", 48),
+		},
+		{
+			name:     "Invalid name with only special characters",
+			input:    "!@#$%^&*()",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeName(tt.input)
+			common.AssertEqual(t, tt.expected, result)
+		})
+	}
 }
 
 const (

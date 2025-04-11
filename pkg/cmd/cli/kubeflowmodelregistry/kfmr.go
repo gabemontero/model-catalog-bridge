@@ -340,22 +340,28 @@ func (m *ModelServerPopulator) GetAuthentication() *bool {
 
 func (m *ModelServerPopulator) GetName() string {
 	if len(m.InferenceServices) > m.InfSvcIndex {
-		msName := m.InferenceServices[m.InfSvcIndex].GetName()
-
-		// Strip out any invalid characters
-		validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
-		msName = validChars.ReplaceAllString(msName, "")
-
-		// Trim to 63 characters if it's over the maximum length
-		if len(msName) > 63 {
-			msName = msName[:63]
-		}
-
-		// Ensure only alphanumeric characters at beginning and end of the name
-		msName = strings.TrimRight(msName, "-_.")
-		return msName
+		sanitizedName := sanitizeName(m.InferenceServices[m.InfSvcIndex].GetName())
+		return sanitizedName
 	}
 	return ""
+}
+
+func sanitizeName(name string) string {
+	sanitizedName := name
+	validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
+
+	// Remove duplicated special characters
+	noDupeChars := regexp.MustCompile(`[-_.]{2,}`)
+	sanitizedName = noDupeChars.ReplaceAllString(sanitizedName, "")
+	if len(sanitizedName) > 63 {
+		sanitizedName = sanitizedName[:63]
+	}
+
+	// Ensure only alphanumeric characters at beginning and end of the name
+	sanitizedName = strings.Trim(sanitizedName, "-_.")
+	return sanitizedName
+
 }
 
 func (m *ModelServerPopulator) GetTags() []string {
