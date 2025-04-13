@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 
 	serverv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kubeflow/model-registry/pkg/openapi"
@@ -337,11 +338,36 @@ func (m *ModelServerPopulator) GetAuthentication() *bool {
 	return &auth
 }
 
+// GetName returns the inference server name, sanitized to meet the following criteria
+// "a string that is sequences of [a-zA-Z0-9] separated by any of [-_.], at most 63 characters in total"
 func (m *ModelServerPopulator) GetName() string {
 	if len(m.InferenceServices) > m.InfSvcIndex {
-		return m.InferenceServices[m.InfSvcIndex].GetName()
+		sanitizedName := sanitizeName(m.InferenceServices[m.InfSvcIndex].GetName())
+		return sanitizedName
 	}
 	return ""
+}
+
+func sanitizeName(name string) string {
+	sanitizedName := name
+
+	// Replace any invalid characters with an empty character
+	validChars := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
+
+	// Remove duplicated special characters
+	noDupeChars := regexp.MustCompile(`[-_.]{2,}`)
+	sanitizedName = noDupeChars.ReplaceAllString(sanitizedName, "")
+
+	// Trim to no more than 63 characters
+	if len(sanitizedName) > 63 {
+		sanitizedName = sanitizedName[:63]
+	}
+
+	// Finally, ensure only alphanumeric characters at beginning and end of the name
+	sanitizedName = strings.Trim(sanitizedName, "-_.")
+	return sanitizedName
+
 }
 
 func (m *ModelServerPopulator) GetTags() []string {
