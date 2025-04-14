@@ -46,6 +46,11 @@ data:
         - type: url
           target: https://github.com/redhat-ai-dev/ai-lab-template/blob/main/all.yaml
       providers:
+        # start of delta from ai-rhdh-installer
+        modelCatalog:
+          development:
+            baseUrl: http://localhost:9090
+        # end of delta from ai-rhdh-installer
         github:
           providerId:
             organization: ${GITHUB__ORG__NAME}
