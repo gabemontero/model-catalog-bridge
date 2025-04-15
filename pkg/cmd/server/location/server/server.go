@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -11,11 +10,9 @@ import (
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type ImportLocationServer struct {
@@ -40,23 +37,14 @@ func NewImportLocationServer(stURL string, nf types.NormalizerFormat) *ImportLoc
 	r.TrustedPlatform = "X-Forwarded-For"
 	r.Use(addRequestId())
 
-	// approach for implementing background processing with gin gonic discovered via some AI interaction;
-	// with this, the location service will wait for up to an hour to bootstrap from the storage service;
-	// this also gives us the option of re-triggering the backgound location/storage sync if that ever became
-	// a useful diagnostic/recovery exercise.
-	r.GET(util.BackgroundStoragePoll, func(c *gin.Context) {
-		// Copy the context to use it safely in the background goroutine
-		ctx := c.Copy()
+	// approach for implementing background processing with gin gonic discovered via some AI interaction lead to some
+	// timing issues with the periodic reconcile of the normalizer/storage-rest loop; decided not to start including
+	// the synchronization needed to sort that out.
+	// So instead, just doing a one time load attempt before registering the upsert handler to speed up location service
+	// population before 2 minute poll interval the loading of reconciled models form storage
 
-		// goroutine for the background task
-		go func() {
-			wait.PollUntilContextTimeout(ctx, 30*time.Second, 1*time.Hour, true, func(context.Context) (done bool, err error) {
-				return i.loadFromStorage()
-			})
-		}()
-
-		c.String(http.StatusOK, "Request received, processing in the background")
-	})
+	klog.Info("one time load attempt from storage instead of waiting for the reconciliation loop")
+	i.loadFromStorage()
 
 	klog.Infof("NewImportLocationServer content len %d", len(i.content))
 	r.GET(util.ListURI, i.handleCatalogDiscoveryGet)
