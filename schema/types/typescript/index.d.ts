@@ -20,6 +20,10 @@ export interface ModelCatalog {
  */
 export interface ModelServer {
     /**
+     * Annotations relating to the model server, in key-value pair format
+     */
+    annotations?: { [key: string]: string };
+    /**
      * The API metadata associated with the model server
      */
     API?: API;
@@ -65,6 +69,10 @@ export interface ModelServer {
  */
 export interface API {
     /**
+     * Annotations relating to the model, in key-value pair format
+     */
+    annotations?: { [key: string]: string };
+    /**
      * A link to the schema used by the model server API
      */
     spec: string;
@@ -99,6 +107,10 @@ export enum Type {
  * Schema for defining AI models conversion to Backstage catalog entities
  */
 export interface Model {
+    /**
+     * Annotations relating to the model, in key-value pair format
+     */
+    annotations?: { [key: string]: string };
     /**
      * A URL to access the model's artifacts, e.g. on HuggingFace, Minio, Github, etc
      */
