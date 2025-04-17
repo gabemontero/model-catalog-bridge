@@ -9,9 +9,16 @@ import (
 	"k8s.io/klog/v2"
 	"os"
 	"os/signal"
+	"regexp"
 	"sigs.k8s.io/yaml"
 	"strings"
 	"syscall"
+)
+
+const (
+	NameInvalidCharRegexp = `[^a-zA-Z0-9\-_]`
+
+	NameNoDuplicateSpecialCharRegexp = `[-_.]{2,}`
 )
 
 func PrintYaml(obj interface{}, addDivider bool, w io.Writer) error {
@@ -78,4 +85,26 @@ func BuildImportKeyAndURI(seg1, seg2 string, format types.NormalizerFormat) (str
 		fn = "model-catalog.json"
 	}
 	return fmt.Sprintf("%s_%s", seg1, seg2), fmt.Sprintf("/%s/%s/%s", seg1, seg2, fn)
+}
+
+func SanitizeName(name string) string {
+	sanitizedName := name
+
+	// Replace any invalid characters with an empty character
+	validChars := regexp.MustCompile(NameInvalidCharRegexp)
+	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
+
+	// Remove duplicated special characters
+	noDupeChars := regexp.MustCompile(NameNoDuplicateSpecialCharRegexp)
+	sanitizedName = noDupeChars.ReplaceAllString(sanitizedName, "")
+
+	// Trim to no more than 63 characters
+	if len(sanitizedName) > 63 {
+		sanitizedName = sanitizedName[:63]
+	}
+
+	// Finally, ensure only alphanumeric characters at beginning and end of the name
+	sanitizedName = strings.Trim(sanitizedName, "-_.")
+	return sanitizedName
+
 }

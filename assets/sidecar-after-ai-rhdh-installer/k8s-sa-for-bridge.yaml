@@ -26,6 +26,14 @@ rules:
       - get
       - list
       - watch
+  - apiGroups: [""]
+    resources:
+      - serviceaccounts
+      - services
+    verbs:
+      - get
+      - list
+      - watch
 
   - apiGroups: ["serving.kserve.io"]
     resources: ["inferenceservices"]

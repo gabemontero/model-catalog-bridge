@@ -30,6 +30,68 @@ The schema that the model catalog bridge will use to collect model and model ser
 
 To re-generate the types that correspond to the schema, run `make generate-types-all`.
 
+### RHOAI Model Registry mapping to our Model Catalog Schema
+
+At this time, most of the model metadata expressed by the Model Catalog Schema does not have corresponding fields in the  
+Kubeflow based Model Registry component's RegisteredModel and ModelVersion data types.  As a result, a AI platform engineer
+who registers a model in RHOAI with the hopes of importing that model into RHDH must use the key/value pairs on the custom properties of the 
+RegisteredModel and ModelVersion types.
+
+To this end, the Model Catalog Bridge looks for these well know keys in the custom properties of the Registered Model and
+Model Versions:
+
+- `License` (waiting on schema update to capture license information); set by the RHOAI Model Catalog
+- `Provider`: the value of this key will be a tag; set by the RHOAI Model Catalog
+- `Registered From`: the value of this key will be a tag; set by the RHOAI Model Catalog
+- `Source model`: the value of this key will be a tag; set by the RHOAI Model Catalog
+- `Source model version`: the value of this key will be a tag; set by the RHOAI Model Catalog
+- `Ethics`: mapped to the ethics field in the schema; set by the AI platform engineer
+- `How to use`: mapped to the how to use field in the schema; set by the AI platform engineer
+- `Support`: mapped to the support field in the schema; set by the AI platform engineer
+- `Training`: mapped to the training field in the schema; set by the AI platform engineer
+- `Usage`: mapped to the usage field in the shcema; set by the AI Platform engineer
+- `Homepage URL`: mapped to homepage URL field in the schema; set by the AI Platform engineer
+- `API Spec`: mapped to the API spec field in the schema; set by the AI Platform engineer
+- `API Type`: mapped to the API type field in the schema; set by the AI Platform engineer
+- `Owner`: mapped to the owner field in the schema; see section below for how this is collected 
+- `Lifecycle`: mapped to the lifecycle field in the schema; see section below for hos this is collected
+
+If the AI platform engineer feels any of these settings are common across multiple Model Versions (the Model Version is 
+the level of the Model Registry API from where you deploy a model), they can use the custom properties of the Registered
+Model.  Otherwise, using the custom properties of the Model Version is also accepted.
+
+If any of these settings is Model Version specific, they the AI platform engineer should use the Model Version custom properties.
+
+**NOTE** while the ModelArtifacts also have custom properties, the user cannot set it from the RHOAI console; at this time,
+we will inspect any key/value pairs the Kubeflow controllers set, and if they meet Backstage naming criteria, they will be
+added as additional tags.
+
+### How the Owner and Lifecycle settings are collected
+
+As the `owner` and `lifecycle` settings are required for all Backstage entities, a non empty value must be provided.
+
+Also, in the case of `owner`, as it turns out, the Model Registry's Registered Model data type does hava an `owner` field.
+
+So for `owner` the order of precedence is:
+
+- take the `Owner` k/v pair's value from the Model Version's custom properites, otherwise from the Registered Model' custom properties
+- use the Registered Model's `owner` field if set
+- use the value of the `DEFAULT_OWNER` environment variable set on the rhoai-normalizer container
+- otherwise, use the default of `rhdh-rhoai-bridge`
+
+Then for `lifecycle` the order of precendence is:
+- take the `Lifecycle` k/v pair's value from the Model Version's custom properites, otherwise from the Registered Model' custom properties
+- use the value of the `DEFAULT_LIFECYCLE` environment variable set on the rhoai-normalizer container
+- otherwise, use the default of `development`
+
+
+### Model Catalog Schema to Backstage Entity settings and Backstage UI
+
+**TO-DO**:  do we want to describe in this repository or the rhdh-plugins repository how the schema is mapped to
+what developers see from the Backstage UI (vs. say whatever private Google Doc we might have for this).  
+Seems conceivable that it would be a useful AI platform engineers, and a feeder into the documentation we ultimatley
+create.
+
 ## Usage
 
 Either via the command line, or from your favorite Golang editor, set the following environment variables as follows
