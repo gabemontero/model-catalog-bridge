@@ -3,6 +3,7 @@ package kubeflowmodelregistry
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -84,7 +85,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 			maa, ok2 := mas[rm.Name]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
 			common.AssertError(t, err)
 		}
 		bwriter.Flush()
@@ -112,13 +113,13 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 			outStr: map[string]*golang.ModelCatalog{
 				"1": {
 					Models: []golang.Model{{
-						Name: "granite-3.1-8b-lab-v1-1.4.0-v1",
+						Name: "granite-31-8b-lab-v1-140-v1",
 					}},
 					ModelServer: nil,
 				},
 				"3": {
 					Models: []golang.Model{{
-						Name: "granite-8b-code-instruct-1.4.0-v1",
+						Name: "granite-8b-code-instruct-140-v1",
 					}},
 					ModelServer: nil,
 				},
@@ -177,7 +178,7 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 			b := []byte{}
 			buf := bytes.NewBuffer(b)
 			bwriter := bufio.NewWriter(buf)
-			err = CallBackstagePrinters(owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
 			common.AssertError(t, err)
 			bwriter.Flush()
 			testMc, ok := tc.outStr[rm.GetId()]
@@ -245,7 +246,7 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 			maa, ok2 := mas[rm.Name]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(owner, lifecycle, &rm, mva, maa, isl, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
+			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
 			common.AssertError(t, err)
 		}
 		bwriter.Flush()
@@ -310,7 +311,7 @@ func TestSanitizeName(t *testing.T) {
 }
 
 const (
-	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}],"modelServer":{"API":{"spec":"TBD","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}}`
+	jsonListWithInferenceOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge"}],"modelServer":{"API":{"spec":"TBD","type":"openapi","url":"https://kserve.com"},"authentication":false,"description":"","lifecycle":"development","name":"mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d","owner":"rhdh-rhoai-bridge","tags":["LastModifiedTime_2025-02-25T19:45:29.959Z"]}}`
 	jsonListWithInferenceOutputYAML = `modelServer:
   API:
     spec: ""
@@ -331,7 +332,7 @@ models:
   owner: rhdh-rhoai-bridge
   tags:
   - _lastModified`
-	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","tags":["_lastModified"]}]}`
+	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge"}]}`
 	jsonListOutputYAML = `models:
 - artifactLocationURL: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx
   description: ""

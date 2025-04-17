@@ -381,7 +381,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						}
 
 						//TODO do we mandate a prop be set on the RM or MV for owner,lifecycle?
-						err = kubeflowmodelregistry.CallBackstagePrinters(util.DefaultOwner,
+						err = kubeflowmodelregistry.CallBackstagePrinters(ctx,
+							util.DefaultOwner,
 							util.DefaultLifecycle,
 							&rm,
 							//TODO deal with multiple versions
@@ -473,7 +474,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				controllerLog.Error(err, "error listing kubeflow inference services")
 				continue
 			}
-			err = kubeflowmodelregistry.CallBackstagePrinters(util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, nil, r.kfmr, r.client, ewriter, r.format)
+			err = kubeflowmodelregistry.CallBackstagePrinters(ctx, util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, nil, r.kfmr, r.client, ewriter, r.format)
 			if err != nil {
 				controllerLog.Error(err, "error processing calling backstage printer")
 				continue
