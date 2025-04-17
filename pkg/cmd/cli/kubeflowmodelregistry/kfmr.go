@@ -387,7 +387,6 @@ type ModelServerPopulator struct {
 	InfSvcIndex int
 	MVIndex     int
 	MAIndex     int
-	Ctx         context.Context
 }
 
 func (m *ModelServerPopulator) getStringPropVal(key string) *string {
@@ -580,7 +579,6 @@ type ModelServerAPIPopulator struct {
 	CommonSchemaPopulator
 	MVIndex int
 	MAIndex int
-	Ctx     context.Context
 }
 
 func (m *ModelServerAPIPopulator) getStringPropVal(key string) *string {
@@ -711,6 +709,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 	compPop.InferenceServices = isl
 	compPop.Kis = is
 	compPop.CtrlClient = client
+	compPop.Ctx = ctx
 
 	switch format {
 	case brdgtypes.JsonArrayForamt:
@@ -718,7 +717,6 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		msPop := ModelServerPopulator{
 			CommonSchemaPopulator: CommonSchemaPopulator{compPop},
 			ApiPop:                ModelServerAPIPopulator{CommonSchemaPopulator: CommonSchemaPopulator{compPop}},
-			Ctx:                   ctx,
 		}
 		mcPop.MSPop = &msPop
 		mPop := ModelPopulator{CommonSchemaPopulator: CommonSchemaPopulator{compPop}}
@@ -737,6 +735,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		resPop.Lifecycle = lifecycle
 		resPop.Kfmr = kfmr
 		resPop.RegisteredModel = rm
+		resPop.ModelVersions = mvs
 		resPop.Kis = is
 		resPop.CtrlClient = client
 		for _, mv := range mvs {
@@ -754,6 +753,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		apiPop.Lifecycle = lifecycle
 		apiPop.Kfmr = kfmr
 		apiPop.RegisteredModel = rm
+		apiPop.ModelVersions = mvs
 		apiPop.InferenceServices = isl
 		apiPop.Kis = is
 		apiPop.CtrlClient = client
@@ -768,10 +768,12 @@ type CommonPopulator struct {
 	Owner             string
 	Lifecycle         string
 	RegisteredModel   *openapi.RegisteredModel
+	ModelVersions     []openapi.ModelVersion
 	InferenceServices []openapi.InferenceService
 	Kfmr              *KubeFlowRESTClientWrapper
 	Kis               *serverv1beta1.InferenceService
 	CtrlClient        client.Client
+	Ctx               context.Context
 }
 
 func (pop *CommonPopulator) GetOwner() string {
@@ -798,7 +800,6 @@ func (pop *CommonPopulator) GetProvidedAPIs() []string {
 
 type ComponentPopulator struct {
 	CommonPopulator
-	ModelVersions  []openapi.ModelVersion
 	ModelArtifacts map[string][]openapi.ModelArtifact
 }
 
@@ -827,6 +828,52 @@ func (pop *ComponentPopulator) GetLinks() []backstage.EntityLink {
 
 func (pop *CommonPopulator) getLinksFromInferenceServices() []backstage.EntityLink {
 	links := []backstage.EntityLink{}
+	// if for some reason kserve/kubeflow reconciliation is not working and there are no kubeflow inference services,
+	// let's match up based on registered model / model version name
+	if len(pop.InferenceServices) == 0 {
+		if pop.Kis != nil {
+			kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
+			links = append(links, kpop.GetLinks()...)
+			return links
+		}
+		iss := []serverv1beta1.InferenceService{}
+		switch {
+		case pop.CtrlClient != nil:
+			isList := &serverv1beta1.InferenceServiceList{}
+			err := pop.CtrlClient.List(pop.Ctx, isList)
+			if err != nil {
+				klog.Errorf("getLinksFromInferenceServices list all inferenceservices error: %s", err.Error())
+			}
+			iss = append(iss, isList.Items...)
+
+		case pop.Kfmr != nil && pop.Kfmr.Config != nil && pop.Kfmr.Config.ServingClient != nil:
+			isList, err := pop.Kfmr.Config.ServingClient.InferenceServices(metav1.NamespaceAll).List(pop.Ctx, metav1.ListOptions{})
+			if err != nil {
+				klog.Errorf("getLinksFromInferenceServices list all inferenceservices error: %s", err.Error())
+			}
+			if isList != nil {
+				iss = append(iss, isList.Items...)
+			}
+		}
+		replacer := strings.NewReplacer(" ", "")
+		rName := pop.RegisteredModel.Name
+		rName = replacer.Replace(rName)
+		for _, mv := range pop.ModelVersions {
+			mn := mv.Name
+			mn = replacer.Replace(mn)
+			key := fmt.Sprintf("%s-%s", rName, mn)
+			for _, is := range iss {
+				if is.Name == key {
+					pop.Kis = &is
+					kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
+					links = append(links, kpop.GetLinks()...)
+					return links
+				}
+			}
+		}
+
+	}
+
 	for _, is := range pop.InferenceServices {
 		var rmid *string
 		var ok bool
@@ -866,6 +913,7 @@ func (pop *CommonPopulator) getLinksFromInferenceServices() []backstage.EntityLi
 				klog.Errorf("ComponentPopulator GetLinks: %s", err.Error())
 				continue
 			}
+
 			pop.Kis = kis
 		}
 		kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
