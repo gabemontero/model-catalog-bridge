@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	corev1 "k8s.io/api/core/v1"
 	"regexp"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -688,7 +688,8 @@ func (m *ModelServerAPIPopulator) GetURL() string {
 		for _, o := range svc.OwnerReferences {
 			if o.Kind == "InferenceService" &&
 				o.Name == m.Kis.Name {
-				return fmt.Sprintf("%s.%s.openshift.io", svc.Name, svc.Namespace)
+				//TODO sort of if a port other than 8080 is needed
+				return fmt.Sprintf("http://%s.%s.openshift.io", svc.Name, svc.Namespace)
 			}
 		}
 	}

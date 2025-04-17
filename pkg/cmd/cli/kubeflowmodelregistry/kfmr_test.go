@@ -10,6 +10,7 @@ import (
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/kfmr"
@@ -25,24 +26,71 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = serverapiv1beta1.AddToScheme(scheme)
 	ts := kfmr.CreateGetServerWithInference(t)
+	ethics := "some ethics related prose like you see on hugging face"
+	howTo := "some curl or python invocation examples"
+	support := "is this supported in a GA fashion, how to ask questions"
+	training := "how the model was trained and perhaps fine tuned"
+	usage := "some basic usage examples"
+	falsePtr := false
+	homepageURL := "https://mymodel.io/welcome"
 	defer ts.Close()
 	for _, tc := range []struct {
-		args []string
 		// we do output compare in chunks as ranges over the components status map are non-deterministic wrt order
-		outStr []string
-		is     *serverapiv1beta1.InferenceService
+		outMc *golang.ModelCatalog
+		is    *serverapiv1beta1.InferenceService
 	}{
 		{
-			args:   []string{"Owner", "Lifecycle"},
-			outStr: []string{jsonListOutputJSON},
+			outMc: &golang.ModelCatalog{
+				Models: []golang.Model{
+					{
+						Description: "simple model that does not require a GPU",
+						Ethics:      &ethics,
+						HowToUseURL: &howTo,
+						Lifecycle:   util.DefaultLifecycle,
+						Name:        "mnist-v1",
+						Owner:       util.DefaultOwner,
+						Support:     &support,
+						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1"},
+						Training:    &training,
+						Usage:       &usage,
+					},
+				},
+			},
 		},
 		{
-			args:   []string{"Owner", "Lifecycle", "1"},
-			outStr: []string{jsonListOutputJSON},
-		},
-		{
-			args:   []string{"Owner", "Lifecycle"},
-			outStr: []string{jsonListWithInferenceOutputJSON},
+			outMc: &golang.ModelCatalog{
+				Models: []golang.Model{
+					{
+						Description: "simple model that does not require a GPU",
+						Ethics:      &ethics,
+						HowToUseURL: &howTo,
+						Lifecycle:   util.DefaultLifecycle,
+						Name:        "mnist-v1",
+						Owner:       util.DefaultOwner,
+						Support:     &support,
+						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1"},
+						Training:    &training,
+						Usage:       &usage,
+					},
+				},
+				ModelServer: &golang.ModelServer{
+					API: &golang.API{
+						Annotations: nil,
+						Spec:        "a openapi spec string",
+						Tags:        nil,
+						Type:        golang.Grpc,
+						URL:         "https://kserve.com",
+					},
+					Authentication: &falsePtr,
+					Description:    "simple model that does not require a GPU",
+					HomepageURL:    &homepageURL,
+					Lifecycle:      util.DefaultLifecycle,
+					Name:           "mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d",
+					Owner:          util.DefaultOwner,
+					Tags:           []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "LastModifiedTime_2025-02-25T19:45:29.959Z"},
+					Usage:          &usage,
+				},
+			},
 			is: &serverapiv1beta1.InferenceService{
 				ObjectMeta: metav1.ObjectMeta{
 					// see test/stub/common/MnistInferenceServices and test/stub/common/MinstServingEnvironment
@@ -60,12 +108,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 		cfg := &config.Config{}
 		kfmr.SetupKubeflowTestRESTClient(ts, cfg)
 		k := SetupKubeflowRESTClient(cfg)
-		owner := tc.args[0]
-		lifecycle := tc.args[1]
 		ids := []string{}
-		if len(tc.args) > 2 {
-			ids = tc.args[2:]
-		}
 		b := []byte{}
 		buf := bytes.NewBuffer(b)
 		bwriter := bufio.NewWriter(buf)
@@ -85,13 +128,94 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 			maa, ok2 := mas[rm.Name]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+			err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
 			common.AssertError(t, err)
-		}
-		bwriter.Flush()
-		outstr := buf.String()
-		for _, str := range tc.outStr {
-			common.AssertLineCompare(t, outstr, str, 0)
+			bwriter.Flush()
+			// so the order of the tags array is random so we can't just do json as a string compare, so we have to
+			// hydrate back to a &golang.ModelCatalog to compare fields
+			outMc := &golang.ModelCatalog{}
+			err = json.Unmarshal(buf.Bytes(), outMc)
+			common.AssertError(t, err)
+			common.AssertEqual(t, tc.outMc.ModelServer == nil, outMc.ModelServer == nil)
+			common.AssertEqual(t, tc.outMc.Models == nil, outMc.Models == nil)
+			common.AssertEqual(t, len(tc.outMc.Models), len(outMc.Models))
+			if len(tc.outMc.Models) > 0 {
+				tcModel := tc.outMc.Models[0]
+				outModel := outMc.Models[0]
+				common.AssertEqual(t, tcModel.Name, outModel.Name)
+				common.AssertEqual(t, tcModel.Description, outModel.Description)
+				common.AssertEqual(t, tcModel.Lifecycle, outModel.Lifecycle)
+				common.AssertEqual(t, tcModel.Owner, outModel.Owner)
+				common.AssertEqual(t, len(tcModel.Tags), len(outModel.Tags))
+				for _, tag := range tcModel.Tags {
+					found := false
+					for _, otag := range outModel.Tags {
+						if otag == tag {
+							found = true
+							break
+						}
+					}
+					common.AssertEqual(t, true, found)
+				}
+				common.AssertEqual(t, tcModel.Ethics == nil, outModel.Ethics == nil)
+				common.AssertEqual(t, tcModel.HowToUseURL == nil, outModel.HowToUseURL == nil)
+				common.AssertEqual(t, tcModel.Support == nil, outModel.Support == nil)
+				common.AssertEqual(t, tcModel.Training == nil, outModel.Training == nil)
+				common.AssertEqual(t, tcModel.Usage == nil, outModel.Usage == nil)
+				if tcModel.Ethics != nil {
+					common.AssertEqual(t, *(tcModel.Ethics), *(outModel.Ethics))
+				}
+				if tcModel.HowToUseURL != nil {
+					common.AssertEqual(t, *(tcModel.HowToUseURL), *(outModel.HowToUseURL))
+				}
+				if tcModel.Support != nil {
+					common.AssertEqual(t, *(tcModel.Support), *(outModel.Support))
+				}
+				if tcModel.Training != nil {
+					common.AssertEqual(t, *(tcModel.Training), *(outModel.Training))
+				}
+				if tcModel.Usage != nil {
+					common.AssertEqual(t, *(tcModel.Usage), *(outModel.Usage))
+				}
+			}
+			if tc.outMc.ModelServer != nil {
+				tms := tc.outMc.ModelServer
+				oms := outMc.ModelServer
+				common.AssertEqual(t, tms.Name, oms.Name)
+				common.AssertEqual(t, tms.Description, oms.Description)
+				common.AssertEqual(t, tms.Lifecycle, oms.Lifecycle)
+				common.AssertEqual(t, tms.Owner, oms.Owner)
+				common.AssertEqual(t, tms.API == nil, oms.API == nil)
+				common.AssertEqual(t, tms.Authentication == nil, oms.Authentication == nil)
+				common.AssertEqual(t, tms.HomepageURL == nil, oms.HomepageURL == nil)
+				common.AssertEqual(t, tms.Usage == nil, oms.Usage == nil)
+				common.AssertEqual(t, len(tms.Tags), len(oms.Tags))
+				if tms.API != nil {
+					common.AssertEqual(t, tms.API.Spec, oms.API.Spec)
+					common.AssertEqual(t, tms.API.URL, oms.API.URL)
+					common.AssertEqual(t, tms.API.Type, oms.API.Type)
+					common.AssertEqual(t, len(tms.API.Tags), len(oms.API.Tags))
+				}
+				if tms.Authentication != nil {
+					common.AssertEqual(t, *(tms.Authentication), *(oms.Authentication))
+				}
+				if tms.HomepageURL != nil {
+					common.AssertEqual(t, *(tms.HomepageURL), *(oms.HomepageURL))
+				}
+				if tms.Usage != nil {
+					common.AssertEqual(t, *(tms.Usage), *(oms.Usage))
+				}
+				for _, tag := range tms.Tags {
+					found := false
+					for _, otag := range oms.Tags {
+						if tag == otag {
+							found = true
+							break
+						}
+					}
+					common.AssertEqual(t, true, found)
+				}
+			}
 		}
 
 	}
@@ -105,12 +229,12 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 	for _, tc := range []struct {
 		args []string
 		// we do output compare in chunks as ranges over the components status map are non-deterministic wrt order
-		outStr map[string]*golang.ModelCatalog
-		is     *serverapiv1beta1.InferenceService
+		outMc map[string]*golang.ModelCatalog
+		is    *serverapiv1beta1.InferenceService
 	}{
 		{
 			args: []string{"Owner", "Lifecycle"},
-			outStr: map[string]*golang.ModelCatalog{
+			outMc: map[string]*golang.ModelCatalog{
 				"1": {
 					Models: []golang.Model{{
 						Name: "granite-31-8b-lab-v1-140-v1",
@@ -167,7 +291,7 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 		common.AssertEqual(t, true, len(rms) > 0)
 		common.AssertEqual(t, true, len(mvs) > 0)
 		common.AssertEqual(t, true, len(mas) > 0)
-		common.AssertEqual(t, true, len(rms) == len(tc.outStr))
+		common.AssertEqual(t, true, len(rms) == len(tc.outMc))
 		for _, rm := range rms {
 			mva, ok := mvs[rm.Name]
 			common.AssertEqual(t, true, ok)
@@ -181,7 +305,7 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
 			common.AssertError(t, err)
 			bwriter.Flush()
-			testMc, ok := tc.outStr[rm.GetId()]
+			testMc, ok := tc.outMc[rm.GetId()]
 			common.AssertEqual(t, true, ok)
 			// so the order of the tags array is random so we can't just do json as a string compare, so we have to
 			// hydrate back to a &golang.ModelCatalog to compare fields
@@ -332,7 +456,7 @@ models:
   owner: rhdh-rhoai-bridge
   tags:
   - _lastModified`
-	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge"}]}`
+	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","ethics":"some ethics related prose like you see on hugging face","howToUseURL":"some curl or python invocation examples","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","support":"is this supported in a GA fashion, how to ask questions","tags":["rhoai","v1","rhoai-model-registry","matteos-lightweight-test-model"],"training":"how the model was trained and perhaps fine tuned","usage":"some basic usage examples"}]}`
 	jsonListOutputYAML = `models:
 - artifactLocationURL: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx
   description: ""
