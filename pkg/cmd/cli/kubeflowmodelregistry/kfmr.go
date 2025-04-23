@@ -14,8 +14,10 @@ import (
 	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -24,10 +26,6 @@ const (
 
 	// pulled from makeValidator.ts in the catalog-model package in core backstage
 	tagRegexp = "^[a-z0-9:+#]+(\\-[a-z0-9:+#]+)*$"
-
-	nameInvalidCharRegexp = `[^a-zA-Z0-9\-_.]`
-
-	nameNoDuplicateSpecialCharRegexp = `[-_.]{2,}`
 )
 
 func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.RegisteredModel, map[string][]openapi.ModelVersion, map[string]map[string][]openapi.ModelArtifact, error) {
@@ -59,8 +57,8 @@ func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.Regi
 			}
 
 			rmArray = append(rmArray, rm)
-			mvsMap[rm.Name] = mvs
-			masMap[rm.Name] = mas
+			mvsMap[util.SanitizeName(rm.Name)] = mvs
+			masMap[util.SanitizeName(rm.Name)] = mas
 		}
 	} else {
 		for _, id := range ids {
@@ -84,8 +82,8 @@ func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.Regi
 				return nil, nil, nil, err
 			}
 			rmArray = append(rmArray, *rm)
-			mvsMap[rm.Name] = mvs
-			masMap[rm.Name] = mas
+			mvsMap[util.SanitizeName(rm.Name)] = mvs
+			masMap[util.SanitizeName(rm.Name)] = mas
 		}
 	}
 	return rmArray, mvsMap, masMap, nil
@@ -119,6 +117,92 @@ func callKubeflowREST(id string, kfmr *KubeFlowRESTClientWrapper) (mvs []openapi
 		ma[*mv.Id] = v
 	}
 	return
+}
+
+func getTagsFromCustomProps(lastMod bool, props map[string]openapi.MetadataValue) map[string]string {
+	tags := map[string]string{}
+	regex, _ := regexp.Compile(tagRegexp)
+	for cpk, cpv := range props {
+		switch {
+		case cpk == brdgtypes.RHOAIModelCatalogSourceModelVersion:
+			fallthrough
+		case cpk == brdgtypes.RHOAIModelCatalogSourceModelKey:
+			fallthrough
+		case cpk == brdgtypes.RHOAIModelCatalogRegisteredFromKey:
+			fallthrough
+		case cpk == brdgtypes.RHOAIModelCatalogProviderKey:
+			fallthrough
+		case cpk == brdgtypes.RHOAIModelRegistryRegisteredFromCatalogRepositoryName:
+			v := ""
+			if cpv.MetadataStringValue != nil {
+				v = strings.ToLower(cpv.MetadataStringValue.StringValue)
+			}
+			if len(v) > 0 && regex.MatchString(v) && len(v) <= 63 {
+				tags[cpk] = v
+			}
+		case cpk == brdgtypes.RHOAIModelRegistryLastModified && lastMod:
+			v := ""
+			replacerColon := strings.NewReplacer(":", "-")
+			replacerDot := strings.NewReplacer(".", "-")
+			replacerT := strings.NewReplacer("T", "-")
+			replacerZ := strings.NewReplacer("Z", "")
+			if cpv.MetadataStringValue != nil {
+				v = replacerColon.Replace(cpv.MetadataStringValue.StringValue)
+				v = replacerDot.Replace(v)
+				v = replacerT.Replace(v)
+				v = replacerZ.Replace(v)
+				v = fmt.Sprintf("last-modified-time-%s", v)
+			}
+			if len(v) > 0 && regex.MatchString(v) && len(v) <= 63 {
+				v = strings.ToLower(v)
+				tags[cpk] = v
+			}
+		default:
+			// user defined that we have no special cased or filtered
+			v := ""
+			if cpv.MetadataStringValue != nil {
+				v = strings.ToLower(cpv.MetadataStringValue.StringValue)
+			}
+			if strings.HasPrefix(v, "_") {
+				continue
+			}
+			if len(v) > 0 && regex.MatchString(v) && len(v) <= 63 {
+				tags[cpk] = v
+			}
+		}
+	}
+	return tags
+}
+
+func commonGetStringPropVal(key string, mvIndex int, mvs []openapi.ModelVersion, rm *openapi.RegisteredModel) *string {
+	var vmap map[string]openapi.MetadataValue
+	var retString *string
+
+	if len(mvs) > mvIndex && mvs[mvIndex].HasCustomProperties() {
+		vmap = mvs[mvIndex].GetCustomProperties()
+		retString = innerGetStringPropVal(key, &vmap)
+		if retString != nil {
+			return retString
+		}
+	}
+
+	if rm.HasCustomProperties() {
+		vmap = rm.GetCustomProperties()
+		retString = innerGetStringPropVal(key, &vmap)
+	}
+	return retString
+}
+
+func innerGetStringPropVal(key string, vmap *map[string]openapi.MetadataValue) *string {
+	v, ok := (*vmap)[key]
+	if !ok {
+		return nil
+	}
+
+	if v.MetadataStringValue != nil {
+		return &v.MetadataStringValue.StringValue
+	}
+	return nil
 }
 
 // json array schema populator
@@ -181,17 +265,29 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		}
 	}
 
-	if !foundInferenceService {
-		return nil
+	if !foundInferenceService && m.Kis == nil {
+		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
+		if m.Kis == nil {
+			return nil
+		}
 	}
 
 	mas := []openapi.ModelArtifact{}
 	for mvidx, mv := range m.ModelVersions {
-		if mv.RegisteredModelId == m.RegisteredModel.GetId() && mv.GetId() == kfmrIS.GetModelVersionId() {
+		switch {
+		// in case kubeflow/kserve reconciliation is not working
+		case m.Kis != nil && fmt.Sprintf("%s-%s", util.SanitizeName(m.RegisteredModel.Name), util.SanitizeName(mv.GetName())) == m.Kis.Name:
+			fallthrough
+		case mv.RegisteredModelId == m.RegisteredModel.GetId() && mv.GetId() == kfmrIS.GetModelVersionId():
+			foundInferenceService = true
 			mvIndex = mvidx
 			mas = m.ModelArtifacts[mv.GetId()]
 			break
 		}
+	}
+
+	if !foundInferenceService {
+		return nil
 	}
 
 	// reminder based on explanations about model artifact actually being the "root" of their model, and what has been observed in testing,
@@ -219,8 +315,6 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		Tags:           m.MSPop.GetTags(),
 		Usage:          m.MSPop.GetUsage(),
 	}
-
-	return nil
 }
 
 type ModelPopulator struct {
@@ -232,49 +326,69 @@ type ModelPopulator struct {
 func (m *ModelPopulator) GetName() string {
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
-		return m.RegisteredModel.Name + "-" + mv.GetName()
+		return util.SanitizeName(m.RegisteredModel.Name) + "-" + util.SanitizeName(mv.GetName())
 	}
 	return ""
 }
 
 func (m *ModelPopulator) GetOwner() string {
-	//TODO need to specify a well known k/v pair or env var for default
-	return util.DefaultOwner
+	owner := m.getStringPropVal(brdgtypes.Owner)
+	if owner != nil {
+		return util.SanitizeName(*owner)
+	}
+	if m.RegisteredModel.Owner != nil {
+		return util.SanitizeName(*m.RegisteredModel.Owner)
+	}
+	return m.Owner
 }
 
 func (m *ModelPopulator) GetLifecycle() string {
-	//TODO need to specify a well known k/v pair or env var for default
-	return util.DefaultLifecycle
+	lifecycle := m.getStringPropVal(brdgtypes.Lifecycle)
+	if lifecycle != nil {
+		return util.SanitizeName(*lifecycle)
+	}
+	return m.Lifecycle
 }
 
 func (m *ModelPopulator) GetDescription() string {
+	desc := ""
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
-		return mv.GetDescription()
+		desc = mv.GetDescription()
 	}
-	return ""
+	if len(desc) == 0 {
+		return m.RegisteredModel.GetDescription()
+	}
+	return desc
 }
 
 func (m *ModelPopulator) GetTags() []string {
-	tags := []string{}
+	tags := getTagsFromCustomProps(false, m.RegisteredModel.GetCustomProperties())
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
 		if mv.HasCustomProperties() {
-			for cpk := range mv.GetCustomProperties() {
-				tags = append(tags, cpk)
+			tagsMV := getTagsFromCustomProps(true, mv.GetCustomProperties())
+			for k, v := range tagsMV {
+				tags[k] = v
 			}
 		}
+		// any MA custom props will be user defined so just add
 		mas, ok := m.ModelArtifacts[mv.Name]
 		if ok {
 			ma := mas[m.MAIndex]
 			if ma.HasCustomProperties() {
-				for cpk := range ma.GetCustomProperties() {
-					tags = append(tags, cpk)
+				tagsMA := getTagsFromCustomProps(true, ma.GetCustomProperties())
+				for k, v := range tagsMA {
+					tags[k] = v
 				}
 			}
 		}
 	}
-	return tags
+	finalTags := []string{}
+	for _, v := range tags {
+		finalTags = append(finalTags, v)
+	}
+	return finalTags
 }
 
 func (m *ModelPopulator) GetArtifactLocationURL() *string {
@@ -291,29 +405,28 @@ func (m *ModelPopulator) GetArtifactLocationURL() *string {
 	return nil
 }
 
+func (m *ModelPopulator) getStringPropVal(key string) *string {
+	return commonGetStringPropVal(key, m.MVIndex, m.ModelVersions, m.RegisteredModel)
+}
+
 func (m *ModelPopulator) GetEthics() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.EthicsKey)
 }
 
 func (m *ModelPopulator) GetHowToUseURL() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.HowToUseKey)
 }
 
 func (m *ModelPopulator) GetSupport() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.SupportKey)
 }
 
 func (m *ModelPopulator) GetTraining() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.TrainingKey)
 }
 
 func (m *ModelPopulator) GetUsage() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.UsageKey)
 }
 
 type ModelServerPopulator struct {
@@ -324,21 +437,47 @@ type ModelServerPopulator struct {
 	MAIndex     int
 }
 
+func (m *ModelServerPopulator) getStringPropVal(key string) *string {
+	return commonGetStringPropVal(key, m.MVIndex, m.ModelVersions, m.RegisteredModel)
+}
+
 func (m *ModelServerPopulator) GetUsage() *string {
-	// unless say the ModelCard output can be retrievable somehow ...
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.UsageKey)
 }
 
 func (m *ModelServerPopulator) GetHomepageURL() *string {
-	//TODO need to specify a well known k/v pair
-	return nil
+	return m.getStringPropVal(brdgtypes.HomepageURLKey)
 }
 
 func (m *ModelServerPopulator) GetAuthentication() *bool {
 	auth := false
-	//TODO have not been able to figure out where the setting of "auth needed" when deploying a model from the MR in the UI gets stored in the plethora
-	// of MR / K8s data types around model serving .... need to ask the RHOAI folks ... maybe it is related to the tls termination policy on the Route?
+	// when auth is configured, a service account is created whose name is prefixed with the inference service's name, and with the
+	// inference service set as an owner reference
+
+	if m.Kis == nil {
+		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
+		if m.Kis == nil {
+			return &auth
+		}
+	}
+	listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
+	saList := &corev1.ServiceAccountList{}
+	err := m.CtrlClient.List(m.Ctx, saList, listOptions)
+	if err != nil {
+		return &auth
+	}
+	for _, sa := range saList.Items {
+		if sa.OwnerReferences == nil {
+			continue
+		}
+		for _, o := range sa.OwnerReferences {
+			if o.Kind == "InferenceService" &&
+				o.Name == m.Kis.Name {
+				auth = true
+				break
+			}
+		}
+	}
 	return &auth
 }
 
@@ -346,60 +485,49 @@ func (m *ModelServerPopulator) GetAuthentication() *bool {
 // "a string that is sequences of [a-zA-Z0-9] separated by any of [-_.], at most 63 characters in total"
 func (m *ModelServerPopulator) GetName() string {
 	if len(m.InferenceServices) > m.InfSvcIndex {
-		sanitizedName := sanitizeName(m.InferenceServices[m.InfSvcIndex].GetName())
+		sanitizedName := util.SanitizeName(m.InferenceServices[m.InfSvcIndex].GetName())
 		return sanitizedName
+	}
+	// if kubeflow/kserve reconciliation is not working, let's use the kserve inference service name
+	if m.Kis != nil {
+		return util.SanitizeName(m.Kis.Name)
 	}
 	return ""
 }
 
-func sanitizeName(name string) string {
-	sanitizedName := name
-
-	// Replace any invalid characters with an empty character
-	validChars := regexp.MustCompile(nameInvalidCharRegexp)
-	sanitizedName = validChars.ReplaceAllString(sanitizedName, "")
-
-	// Remove duplicated special characters
-	noDupeChars := regexp.MustCompile(nameNoDuplicateSpecialCharRegexp)
-	sanitizedName = noDupeChars.ReplaceAllString(sanitizedName, "")
-
-	// Trim to no more than 63 characters
-	if len(sanitizedName) > 63 {
-		sanitizedName = sanitizedName[:63]
-	}
-
-	// Finally, ensure only alphanumeric characters at beginning and end of the name
-	sanitizedName = strings.Trim(sanitizedName, "-_.")
-	return sanitizedName
-
-}
-
 func (m *ModelServerPopulator) GetTags() []string {
-	tags := m.ApiPop.GetTags()
+	tags := getTagsFromCustomProps(false, m.RegisteredModel.GetCustomProperties())
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
 		if mv.HasCustomProperties() {
-			for cpk := range mv.GetCustomProperties() {
-				tags = append(tags, cpk)
+			tagsMV := getTagsFromCustomProps(true, mv.GetCustomProperties())
+			for k, v := range tagsMV {
+				tags[k] = v
 			}
 		}
+		// any MA custom props will be user defined so just add
 		mas, ok := m.ModelArtifacts[mv.Name]
 		if ok {
-			if len(mas) > m.MAIndex {
-				ma := mas[m.MAIndex]
-				if ma.HasCustomProperties() {
-					for cpk := range ma.GetCustomProperties() {
-						tags = append(tags, cpk)
-					}
+			ma := mas[m.MAIndex]
+			if ma.HasCustomProperties() {
+				tagsMA := getTagsFromCustomProps(true, ma.GetCustomProperties())
+				for k, v := range tagsMA {
+					tags[k] = v
 				}
-
 			}
 		}
 	}
-	return tags
+	finalTags := []string{}
+	for _, v := range tags {
+		finalTags = append(finalTags, v)
+	}
+	return finalTags
 }
 
 func (m *ModelServerPopulator) GetAPI() *golang.API {
+	m.ApiPop.MVIndex = m.MVIndex
+	m.ApiPop.MAIndex = m.MAIndex
+	m.ApiPop.Ctx = m.Ctx
 	api := &golang.API{
 		Spec: m.ApiPop.GetSpec(),
 		Tags: m.ApiPop.GetTags(),
@@ -410,55 +538,152 @@ func (m *ModelServerPopulator) GetAPI() *golang.API {
 }
 
 func (m *ModelServerPopulator) GetOwner() string {
-	//TODO need to specify a well known k/v pair or env var for default
-	return util.DefaultOwner
+	owner := m.getStringPropVal(brdgtypes.Owner)
+	if owner != nil {
+		return util.SanitizeName(*owner)
+	}
+	if m.RegisteredModel.Owner != nil {
+		return util.SanitizeName(*m.RegisteredModel.Owner)
+	}
+	return m.Owner
 }
 
 func (m *ModelServerPopulator) GetLifecycle() string {
-	//TODO need to specify a well known k/v pair or env var for default
-	return util.DefaultLifecycle
+	lifecycle := m.getStringPropVal(brdgtypes.Lifecycle)
+	if lifecycle != nil {
+		return *lifecycle
+	}
+	return m.Lifecycle
 }
 
 func (m *ModelServerPopulator) GetDescription() string {
-	return m.RegisteredModel.GetDescription()
+	desc := ""
+	if len(m.ModelVersions) > m.MVIndex {
+		mv := m.ModelVersions[m.MVIndex]
+		desc = mv.GetDescription()
+	}
+	if len(desc) == 0 {
+		return m.RegisteredModel.GetDescription()
+	}
+	return desc
 }
 
 type ModelServerAPIPopulator struct {
 	CommonSchemaPopulator
+	MVIndex int
+	MAIndex int
+}
+
+func (m *ModelServerAPIPopulator) getStringPropVal(key string) *string {
+	return commonGetStringPropVal(key, m.MVIndex, m.ModelVersions, m.RegisteredModel)
 }
 
 func (m *ModelServerAPIPopulator) GetSpec() string {
-	//TODO need to specify a well known k/v pair
-	// that said, Backstage complains if this is an empty string
-	return "TBD"
+	ret := m.getStringPropVal(brdgtypes.APISpecKey)
+	if ret == nil {
+		return "TBD"
+	}
+	return *ret
 }
 
 func (m *ModelServerAPIPopulator) GetTags() []string {
-	tags := []string{}
-	regex, _ := regexp.Compile(tagRegexp)
-	if m.RegisteredModel.CustomProperties != nil {
-		for cPropKey := range *m.RegisteredModel.CustomProperties {
-			if regex.MatchString(cPropKey) && len(cPropKey) <= 63 {
-				tags = append(tags, cPropKey)
-				continue
+	tags := getTagsFromCustomProps(false, m.RegisteredModel.GetCustomProperties())
+	if len(m.ModelVersions) > m.MVIndex {
+		mv := m.ModelVersions[m.MVIndex]
+		if mv.HasCustomProperties() {
+			tagsMV := getTagsFromCustomProps(true, mv.GetCustomProperties())
+			for k, v := range tagsMV {
+				tags[k] = v
 			}
-			klog.Infof("skipping custom prop key %s", cPropKey)
+		}
+		// any MA custom props will be user defined so just add
+		mas, ok := m.ModelArtifacts[mv.Name]
+		if ok {
+			ma := mas[m.MAIndex]
+			if ma.HasCustomProperties() {
+				tagsMA := getTagsFromCustomProps(true, ma.GetCustomProperties())
+				for k, v := range tagsMA {
+					tags[k] = v
+				}
+			}
 		}
 	}
-	return tags
+	finalTags := []string{}
+	for _, v := range tags {
+		finalTags = append(finalTags, v)
+	}
+	return finalTags
 }
 
 func (m *ModelServerAPIPopulator) GetType() golang.Type {
-	//TODO need to specify a well known k/v pair
+	t := m.getStringPropVal(brdgtypes.APITypeKey)
+	if t == nil {
+		// assume open api
+		return golang.Openapi
+	}
+	switch {
+	case golang.Type(*t) == golang.Graphql:
+		return golang.Graphql
+	case golang.Type(*t) == golang.Asyncapi:
+		return golang.Asyncapi
+	case golang.Type(*t) == golang.Grpc:
+		return golang.Grpc
+	}
 	return golang.Openapi
 }
 
 func (m *ModelServerAPIPopulator) GetURL() string {
 	if m.Kis == nil {
-		m.getLinksFromInferenceServices()
+		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
+		if m.Kis == nil {
+			return ""
+		}
 	}
-	if m.Kis != nil && m.Kis.Status.URL != nil && m.Kis.Status.URL.URL() != nil {
-		// return the KServe InferenceService Route URL
+	if m.Kis.Status.URL != nil && m.Kis.Status.URL.URL() != nil {
+		// return the KServe InferenceService Route or Service URL
+		kisUrl := m.Kis.Status.URL.URL().String()
+		if strings.Contains(kisUrl, "svc.cluster.local") {
+			// only the service was exposed
+
+			// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
+			// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
+			// the port correctly; so we will find the corresponding service and add the port
+			listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
+			svcList := &corev1.ServiceList{}
+			err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
+			if err != nil {
+				return ""
+			}
+			for _, svc := range svcList.Items {
+				if svc.OwnerReferences == nil {
+					continue
+				}
+				for _, o := range svc.OwnerReferences {
+					if o.Kind == "InferenceService" &&
+						o.Name == m.Kis.Name &&
+						strings.HasSuffix(svc.Name, "-predictor") {
+						// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
+						// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
+						// the port correctly
+						var port int32
+						port = 0
+						for _, sp := range svc.Spec.Ports {
+							port = sp.Port
+							if sp.TargetPort.Type == intstr.Int {
+								port = sp.TargetPort.IntVal
+							}
+							break
+						}
+						portStr := ""
+						if port != 0 && port != 80 {
+							portStr = fmt.Sprintf(":%d", port)
+						}
+						return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
+					}
+				}
+			}
+
+		}
 		return m.Kis.Status.URL.URL().String()
 	}
 
@@ -467,7 +692,7 @@ func (m *ModelServerAPIPopulator) GetURL() string {
 
 // catalog-info.yaml populators
 
-func CallBackstagePrinters(owner, lifecycle string, rm *openapi.RegisteredModel, mvs []openapi.ModelVersion, mas map[string][]openapi.ModelArtifact, isl []openapi.InferenceService, is *serverv1beta1.InferenceService, kfmr *KubeFlowRESTClientWrapper, client client.Client, writer io.Writer, format brdgtypes.NormalizerFormat) error {
+func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *openapi.RegisteredModel, mvs []openapi.ModelVersion, mas map[string][]openapi.ModelArtifact, isl []openapi.InferenceService, is *serverv1beta1.InferenceService, kfmr *KubeFlowRESTClientWrapper, client client.Client, writer io.Writer, format brdgtypes.NormalizerFormat) error {
 	compPop := ComponentPopulator{}
 	compPop.Owner = owner
 	compPop.Lifecycle = lifecycle
@@ -478,6 +703,7 @@ func CallBackstagePrinters(owner, lifecycle string, rm *openapi.RegisteredModel,
 	compPop.InferenceServices = isl
 	compPop.Kis = is
 	compPop.CtrlClient = client
+	compPop.Ctx = ctx
 
 	switch format {
 	case brdgtypes.JsonArrayForamt:
@@ -503,6 +729,7 @@ func CallBackstagePrinters(owner, lifecycle string, rm *openapi.RegisteredModel,
 		resPop.Lifecycle = lifecycle
 		resPop.Kfmr = kfmr
 		resPop.RegisteredModel = rm
+		resPop.ModelVersions = mvs
 		resPop.Kis = is
 		resPop.CtrlClient = client
 		for _, mv := range mvs {
@@ -520,6 +747,7 @@ func CallBackstagePrinters(owner, lifecycle string, rm *openapi.RegisteredModel,
 		apiPop.Lifecycle = lifecycle
 		apiPop.Kfmr = kfmr
 		apiPop.RegisteredModel = rm
+		apiPop.ModelVersions = mvs
 		apiPop.InferenceServices = isl
 		apiPop.Kis = is
 		apiPop.CtrlClient = client
@@ -534,15 +762,17 @@ type CommonPopulator struct {
 	Owner             string
 	Lifecycle         string
 	RegisteredModel   *openapi.RegisteredModel
+	ModelVersions     []openapi.ModelVersion
 	InferenceServices []openapi.InferenceService
 	Kfmr              *KubeFlowRESTClientWrapper
 	Kis               *serverv1beta1.InferenceService
 	CtrlClient        client.Client
+	Ctx               context.Context
 }
 
 func (pop *CommonPopulator) GetOwner() string {
 	if pop.RegisteredModel.Owner != nil {
-		return *pop.RegisteredModel.Owner
+		return util.SanitizeName(*pop.RegisteredModel.Owner)
 	}
 	return pop.Owner
 }
@@ -564,16 +794,15 @@ func (pop *CommonPopulator) GetProvidedAPIs() []string {
 
 type ComponentPopulator struct {
 	CommonPopulator
-	ModelVersions  []openapi.ModelVersion
 	ModelArtifacts map[string][]openapi.ModelArtifact
 }
 
 func (pop *ComponentPopulator) GetName() string {
-	return pop.RegisteredModel.Name
+	return util.SanitizeName(pop.RegisteredModel.Name)
 }
 
 func (pop *ComponentPopulator) GetLinks() []backstage.EntityLink {
-	links := pop.getLinksFromInferenceServices()
+	links := pop.GetLinksFromInferenceServices()
 	//TODO maybe multi resource / multi model indication
 	for _, maa := range pop.ModelArtifacts {
 		for _, ma := range maa {
@@ -591,8 +820,59 @@ func (pop *ComponentPopulator) GetLinks() []backstage.EntityLink {
 	return links
 }
 
-func (pop *CommonPopulator) getLinksFromInferenceServices() []backstage.EntityLink {
+func (pop *CommonPopulator) GetInferenceServerByRegModelModelVersionName() *serverv1beta1.InferenceService {
+	iss := []serverv1beta1.InferenceService{}
+	switch {
+	case pop.CtrlClient != nil:
+		isList := &serverv1beta1.InferenceServiceList{}
+		err := pop.CtrlClient.List(pop.Ctx, isList)
+		if err != nil {
+			klog.Errorf("getLinksFromInferenceServices list all inferenceservices error: %s", err.Error())
+			return nil
+		}
+		iss = append(iss, isList.Items...)
+
+	case pop.Kfmr != nil && pop.Kfmr.Config != nil && pop.Kfmr.Config.ServingClient != nil:
+		isList, err := pop.Kfmr.Config.ServingClient.InferenceServices(metav1.NamespaceAll).List(pop.Ctx, metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("getLinksFromInferenceServices list all inferenceservices error: %s", err.Error())
+			return nil
+		}
+		if isList != nil {
+			iss = append(iss, isList.Items...)
+		}
+	}
+	rName := util.SanitizeName(pop.RegisteredModel.Name)
+	for _, mv := range pop.ModelVersions {
+		mn := util.SanitizeName(mv.Name)
+		key := fmt.Sprintf("%s-%s", rName, mn)
+		for _, is := range iss {
+			if is.Name == key {
+				return &is
+			}
+		}
+	}
+	return nil
+}
+
+func (pop *CommonPopulator) GetLinksFromInferenceServices() []backstage.EntityLink {
 	links := []backstage.EntityLink{}
+	// if for some reason kserve/kubeflow reconciliation is not working and there are no kubeflow inference services,
+	// let's match up based on registered model / model version name
+	if len(pop.InferenceServices) == 0 {
+		if pop.Kis != nil {
+			kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
+			links = append(links, kpop.GetLinks()...)
+			return links
+		}
+		pop.Kis = pop.GetInferenceServerByRegModelModelVersionName()
+		if pop.Kis != nil {
+			kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
+			links = append(links, kpop.GetLinks()...)
+			return links
+		}
+	}
+
 	for _, is := range pop.InferenceServices {
 		var rmid *string
 		var ok bool
@@ -632,6 +912,7 @@ func (pop *CommonPopulator) getLinksFromInferenceServices() []backstage.EntityLi
 				klog.Errorf("ComponentPopulator GetLinks: %s", err.Error())
 				continue
 			}
+
 			pop.Kis = kis
 		}
 		kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
@@ -770,7 +1051,7 @@ func (pop *ResourcePopulator) GetTags() []string {
 }
 
 func (pop *ResourcePopulator) GetDependencyOf() []string {
-	return []string{fmt.Sprintf("component:%s", pop.RegisteredModel.Name)}
+	return []string{fmt.Sprintf("component:%s", util.SanitizeName(pop.RegisteredModel.Name))}
 }
 
 func (pop *ResourcePopulator) GetDisplayName() string {
@@ -782,11 +1063,11 @@ type ApiPopulator struct {
 }
 
 func (pop *ApiPopulator) GetName() string {
-	return pop.RegisteredModel.Name
+	return util.SanitizeName(pop.RegisteredModel.Name)
 }
 
 func (pop *ApiPopulator) GetDependencyOf() []string {
-	return []string{fmt.Sprintf("component:%s", pop.RegisteredModel.Name)}
+	return []string{fmt.Sprintf("component:%s", util.SanitizeName(pop.RegisteredModel.Name))}
 }
 
 func (pop *ApiPopulator) GetDefinition() string {
@@ -804,7 +1085,7 @@ func (pop *ApiPopulator) GetTags() []string {
 }
 
 func (pop *ApiPopulator) GetLinks() []backstage.EntityLink {
-	return pop.getLinksFromInferenceServices()
+	return pop.GetLinksFromInferenceServices()
 }
 
 func (pop *ApiPopulator) GetDisplayName() string {

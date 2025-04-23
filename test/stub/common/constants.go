@@ -1587,7 +1587,92 @@ const (
 
 	MnistRegisteredModels    = `{"items":[{"createTimeSinceEpoch":"1740498236442","customProperties":{"_lastModified":{"metadataType":"MetadataStringValue","string_value":"2025-02-25T15:43:56.876Z"}},"id":"1","lastUpdateTimeSinceEpoch":"1740498237116","name":"mnist","owner":"kube:admin","state":"LIVE"}],"nextPageToken":"","pageSize":0,"size":1}`
 	MnistRegisteredModelsGet = `{"createTimeSinceEpoch":"1740498236442","customProperties":{"_lastModified":{"metadataType":"MetadataStringValue","string_value":"2025-02-25T15:43:56.876Z"}},"id":"1","lastUpdateTimeSinceEpoch":"1740498237116","name":"mnist","owner":"kube:admin","state":"LIVE"}`
-	MnistModelVersions       = `{"items":[{"author":"kube:admin","createTimeSinceEpoch":"1740498236719","customProperties":{"_lastModified":{"metadataType":"MetadataStringValue","string_value":"2025-02-25T19:45:29.959Z"}},"id":"2","lastUpdateTimeSinceEpoch":"1740512730384","name":"v1","registeredModelId":"1","state":"LIVE"}],"nextPageToken":"","pageSize":0,"size":1}`
+	MnistModelVersions       = `{
+    "items":
+    [
+       {
+          "author":"kube:admin",
+          "createTimeSinceEpoch":"1740498236719",
+           "customProperties":
+              {
+                "_lastModified":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"2025-02-25T19:45:29.959Z"
+                  },
+                  "Provider":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"rhoai"
+                  },
+                  "Registered from":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"rhoai-model-registry"
+                  },
+                  "Source model":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"matteos-lightweight-test-model"
+                  },
+                  "Source model version":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"v1"
+                  },
+                  "Ethics":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"some ethics related prose like you see on hugging face"
+                  },
+                  "How to use":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"some curl or python invocation examples"
+                  },
+                  "Support":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"is this supported in a GA fashion, how to ask questions"
+                  },
+                  "Training":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"how the model was trained and perhaps fine tuned"
+                  },
+                  "Usage":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"some basic usage examples"
+                  },
+                  "Homepage URL":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"https://mymodel.io/welcome"
+                  },
+                  "API Spec":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"a openapi spec string"
+                  },
+                  "API Type":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"grpc"
+                  }
+              },
+           "description":"simple model that does not require a GPU",
+           "id":"2",
+           "lastUpdateTimeSinceEpoch":"1740512730384",
+           "name":"v1",
+           "registeredModelId":"1",
+           "state":"LIVE"
+       }
+    ],
+    "nextPageToken":"",
+    "pageSize":0,
+    "size":1
+}`
 	MnistModelArtifacts      = `{"items":[{"artifactType":"model-artifact","createTimeSinceEpoch":"1740498237469","customProperties":{},"id":"1","lastUpdateTimeSinceEpoch":"1740498237469","modelFormatName":"onnx","modelFormatVersion":"1","name":"v1","state":"LIVE","uri":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx"}],"nextPageToken":"","pageSize":0,"size":1}`
 	MnistInferenceServices   = `{"items":[{"createTimeSinceEpoch":"1740512730723","customProperties":{},"desiredState":"DEPLOYED","id":"4","lastUpdateTimeSinceEpoch":"1740512730723","modelVersionId":"2","name":"mnist-v1/8c2c357f-bf82-4d2d-a254-43eca96fd31d","registeredModelId":"1","runtime":"mnist-v1","servingEnvironmentId":"3"}],"nextPageToken":"","pageSize":0,"size":1}`
 	MnistServingEnvironments = `{"items":[{"createTimeSinceEpoch":"1740512730477","customProperties":{},"id":"3","lastUpdateTimeSinceEpoch":"1740512730477","name":"ggmtest"}],"nextPageToken":"","pageSize":0,"size":1}`
