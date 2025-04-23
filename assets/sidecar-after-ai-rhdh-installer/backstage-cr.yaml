@@ -102,7 +102,8 @@ spec:
                   - name: NORMALIZER_FORMAT
                     value: JsonArrayFormat
                   - name: MR_ROUTE
-                    value: odh-model-registries-modelregistry-public-rest
+                    # if using ODH then change rhoai to odh in the value here
+                    value: rhoai-model-registries-modelregistry-public-rest
                   - name: POD_IP
                     valueFrom:
                       fieldRef:
