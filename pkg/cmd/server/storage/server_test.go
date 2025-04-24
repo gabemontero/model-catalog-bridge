@@ -160,12 +160,10 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 			expectedSC: http.StatusCreated,
 		},
 		{
-			name:   "updated entry",
-			reqURL: url.URL{RawQuery: "key=mnist_v1"},
-			body:   rest.PostBody{Body: []byte("update")},
-			//TODO temporarily changed until we sort out registering the rhdh-rhoai-bridge import type in RHDH
-			//expectedSC: http.StatusOK,
-			expectedSC: http.StatusCreated,
+			name:       "updated entry",
+			reqURL:     url.URL{RawQuery: "key=mnist_v1"},
+			body:       rest.PostBody{Body: []byte("update")},
+			expectedSC: http.StatusOK,
 		},
 	} {
 		testWriter := testgin.NewTestResponseWriter()
@@ -228,8 +226,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 				return true
 			})
 			// backstage called
-			//TODO temporarily disabled until we sort out registering the rhdh-rhoai-bridge import type in RHDH
-			//common.AssertEqual(t, true, found)
+			common.AssertEqual(t, true, found)
 
 			// clear out call cache for next check
 			for _, k := range keyList {
@@ -293,8 +290,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 	_, ok := locationCallback.Load("delete")
 	common.AssertEqual(t, true, ok)
 
-	//TODO temp disable until we sort out how to register rhdh-rhoai-bridge import type into RHDH
-	//_, ok = backstageCallback.Load("delete")
-	//common.AssertEqual(t, true, ok)
+	_, ok = backstageCallback.Load("delete")
+	common.AssertEqual(t, true, ok)
 
 }
