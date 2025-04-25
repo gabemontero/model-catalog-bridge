@@ -276,7 +276,7 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 	for mvidx, mv := range m.ModelVersions {
 		switch {
 		// in case kubeflow/kserve reconciliation is not working
-		case m.Kis != nil && fmt.Sprintf("%s-%s", util.SanitizeName(m.RegisteredModel.Name), util.SanitizeName(mv.GetName())) == m.Kis.Name:
+		case m.Kis != nil && util.KServeInferenceServiceMapping(m.RegisteredModel.Name, mv.GetName(), m.Kis.Name):
 			fallthrough
 		case mv.RegisteredModelId == m.RegisteredModel.GetId() && mv.GetId() == kfmrIS.GetModelVersionId():
 			foundInferenceService = true
@@ -842,12 +842,9 @@ func (pop *CommonPopulator) GetInferenceServerByRegModelModelVersionName() *serv
 			iss = append(iss, isList.Items...)
 		}
 	}
-	rName := util.SanitizeName(pop.RegisteredModel.Name)
 	for _, mv := range pop.ModelVersions {
-		mn := util.SanitizeName(mv.Name)
-		key := fmt.Sprintf("%s-%s", rName, mn)
 		for _, is := range iss {
-			if is.Name == key {
+			if util.KServeInferenceServiceMapping(pop.RegisteredModel.Name, mv.Name, is.Name) {
 				return &is
 			}
 		}
