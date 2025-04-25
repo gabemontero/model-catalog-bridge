@@ -86,9 +86,10 @@ export interface API {
     type: Type;
     /**
      * The URL that the model server's REST API is exposed over, how the model(s) are interacted
-     * with
+     * with. An array of strings, to allow for both external and internal API URLs to be
+     * included.
      */
-    url: string;
+    url: string[];
 }
 
 /**
@@ -127,6 +128,10 @@ export interface Model {
      * The URL pointing to any specific documentation on how to use the model on the model server
      */
     howToUseURL?: string;
+    /**
+     * The license used by the model (e.g. Apache-2).
+     */
+    license?: string;
     /**
      * The lifecycle state of the model server API
      */

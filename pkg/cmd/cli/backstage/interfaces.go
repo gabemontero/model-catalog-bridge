@@ -3,11 +3,12 @@ package backstage
 // model catalog json schema populators
 
 import (
+	"io"
+	"strings"
+
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
-	"io"
 	"k8s.io/klog/v2"
-	"strings"
 )
 
 type ModelCatalogPopulator interface {
@@ -41,6 +42,7 @@ type ModelPopulator interface {
 	GetSupport() *string
 	GetTraining() *string
 	GetUsage() *string
+	GetTechDocs() *string
 }
 
 type ModelServerAPIPopulator interface {

@@ -244,6 +244,11 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 			Training:            mPop.GetTraining(),
 			Usage:               mPop.GetUsage(),
 		}
+
+		techDocsUrl := mPop.GetTechDocs()
+		if techDocsUrl != nil && *techDocsUrl != "" {
+			model.Annotations["techdocs"] = *techDocsUrl
+		}
 		models = append(models, model)
 	}
 	return models
@@ -427,6 +432,16 @@ func (m *ModelPopulator) GetTraining() *string {
 
 func (m *ModelPopulator) GetUsage() *string {
 	return m.getStringPropVal(brdgtypes.UsageKey)
+}
+
+func (m *ModelPopulator) GetTechDocs() *string {
+	techdocsUrl := m.getStringPropVal(brdgtypes.TechDocsKey)
+	if techdocsUrl == nil && strings.Contains(m.GetName(), brdgtypes.Granite318bLabName) {
+		granite31TechDocs := brdgtypes.Granite318bLabTechDocs
+		return &granite31TechDocs
+	} else {
+		return techdocsUrl
+	}
 }
 
 type ModelServerPopulator struct {
@@ -632,62 +647,65 @@ func (m *ModelServerAPIPopulator) GetType() golang.Type {
 	return golang.Openapi
 }
 
-func (m *ModelServerAPIPopulator) GetURL() string {
+func (m *ModelServerAPIPopulator) GetURL() []string {
+	serviceUrls := []string{}
+
 	if m.Kis == nil {
 		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
 		if m.Kis == nil {
-			return ""
+			return []string{}
 		}
 	}
 	if m.Kis.Status.URL != nil && m.Kis.Status.URL.URL() != nil {
 		// return the KServe InferenceService Route or Service URL
+
+		serviceUrls := []string{}
+
 		kisUrl := m.Kis.Status.URL.URL().String()
-		if strings.Contains(kisUrl, "svc.cluster.local") {
-			// only the service was exposed
 
-			// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-			// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-			// the port correctly; so we will find the corresponding service and add the port
-			listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
-			svcList := &corev1.ServiceList{}
-			err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
-			if err != nil {
-				return ""
-			}
-			for _, svc := range svcList.Items {
-				if svc.OwnerReferences == nil {
-					continue
-				}
-				for _, o := range svc.OwnerReferences {
-					if o.Kind == "InferenceService" &&
-						o.Name == m.Kis.Name &&
-						strings.HasSuffix(svc.Name, "-predictor") {
-						// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-						// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-						// the port correctly
-						var port int32
-						port = 0
-						for _, sp := range svc.Spec.Ports {
-							port = sp.Port
-							if sp.TargetPort.Type == intstr.Int {
-								port = sp.TargetPort.IntVal
-							}
-							break
-						}
-						portStr := ""
-						if port != 0 && port != 80 {
-							portStr = fmt.Sprintf(":%d", port)
-						}
-						return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
-					}
-				}
-			}
-
+		// Append the external URL if it was created
+		if !strings.Contains(kisUrl, "svc.cluster.local") {
+			serviceUrls = append(serviceUrls, kisUrl)
 		}
-		return m.Kis.Status.URL.URL().String()
+
+		// Fetch the InferenceService and retrieve its internal service
+		listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
+		svcList := &corev1.ServiceList{}
+		err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
+		if err != nil {
+			return serviceUrls
+		}
+		for _, svc := range svcList.Items {
+			if svc.OwnerReferences == nil {
+				continue
+			}
+			for _, o := range svc.OwnerReferences {
+				if o.Kind == "InferenceService" &&
+					o.Name == m.Kis.Name &&
+					strings.HasSuffix(svc.Name, "-predictor") {
+					// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
+					// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
+					// the port correctly
+					var port int32
+					port = 0
+					for _, sp := range svc.Spec.Ports {
+						port = sp.Port
+						if sp.TargetPort.Type == intstr.Int {
+							port = sp.TargetPort.IntVal
+						}
+						break
+					}
+					portStr := ""
+					if port != 0 && port != 80 {
+						portStr = fmt.Sprintf(":%d", port)
+					}
+					serviceUrls = append(serviceUrls, fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr))
+				}
+			}
+		}
 	}
 
-	return ""
+	return serviceUrls
 }
 
 // catalog-info.yaml populators

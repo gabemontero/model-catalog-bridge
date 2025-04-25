@@ -6,7 +6,7 @@
     "usage": "Model server usage description",
     "tags": ["vLLM", "granite", "ibm"],
     "API": {
-      "url": "https://api.example.com",
+      "url": ["https://api.example.com", "http://model.ns.svc.cluster.local"],
       "type": "openapi",
       "spec": "https://raw.githubusercontent.com/redhat-ai-dev/model-catalog-example/refs/heads/main/developer-model-service/openapi.json",
       "tags": ["openapi", "openai", "3scale"]

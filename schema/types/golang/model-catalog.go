@@ -1,4 +1,4 @@
-// Code generated from JSON Schema using quicktype. DO NOT EDIT.
+// This file was generated from JSON Schema using quicktype, do not modify it directly.
 // To parse and unparse this JSON data, add this code to your project and do:
 //
 //    modelCatalog, err := UnmarshalModelCatalog(bytes)
@@ -67,8 +67,9 @@ type API struct {
 	// The type of API that the model server exposes                                                              
 	Type                                                                                        Type              `json:"type"`
 	// The URL that the model server's REST API is exposed over, how the model(s) are interacted                  
-	// with                                                                                                       
-	URL                                                                                         string            `json:"url"`
+	// with. An array of strings, to allow for both external and internal API URLs to be                          
+	// included.                                                                                                  
+	URL                                                                                         []string          `json:"url"`
 }
 
 // An AI model to be imported into the Backstage catalog
@@ -85,6 +86,8 @@ type Model struct {
 	Ethics                                                                                       *string           `json:"ethics,omitempty"`
 	// The URL pointing to any specific documentation on how to use the model on the model server                  
 	HowToUseURL                                                                                  *string           `json:"howToUseURL,omitempty"`
+	// The license used by the model (e.g. Apache-2).                                                              
+	License                                                                                      *string           `json:"license,omitempty"`
 	// The lifecycle state of the model server API                                                                 
 	Lifecycle                                                                                    string            `json:"lifecycle"`
 	// The name of the model                                                                                       

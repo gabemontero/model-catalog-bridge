@@ -129,8 +129,11 @@
                             }
                         },
                         "url": {
-                            "description": "The URL that the model server's REST API is exposed over, how the model(s) are interacted with",
-                            "type": "string"
+                            "description": "The URL that the model server's REST API is exposed over, how the model(s) are interacted with. An array of strings, to allow for both external and internal API URLs to be included.",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
                         },
                         "annotations": {
                             "description": "Annotations relating to the model, in key-value pair format",
@@ -165,6 +168,10 @@
                 },
                 "ethics": {
                     "description": "Any ethical considerations for the model",
+                    "type": "string"
+                },
+                "license": {
+                    "description": "The license used by the model (e.g. Apache-2).",
                     "type": "string"
                 },
                 "howToUseURL": {

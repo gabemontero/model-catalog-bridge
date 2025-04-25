@@ -79,7 +79,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 						Spec:        "a openapi spec string",
 						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
 						Type:        golang.Grpc,
-						URL:         "https://kserve.com",
+						URL:         []string{"https://kserve.com"},
 					},
 					Authentication: &falsePtr,
 					Description:    "simple model that does not require a GPU",
@@ -252,7 +252,7 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 					ModelServer: &golang.ModelServer{
 						Name: "mnist-v10abd9005-9642-4cbf-848b-1c4da91c3437",
 						API: &golang.API{
-							URL: "https://kserve.com",
+							URL: []string{"https://kserve.com"},
 						},
 					},
 				}},
