@@ -360,16 +360,13 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 	// let's match up based on registered model / model version name
 	if len(kfmrISs) == 0 {
 		for _, rm := range kfmrRMs {
-			rName := util.SanitizeName(rm.Name)
 			mvs := []openapi.ModelVersion{}
 			mvs, err = r.kfmr.ListModelVersions(rm.GetId())
 			if err != nil {
 				log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error list kfmr model version %s", name.String(), rm.GetId()))
 			}
 			for _, mv := range mvs {
-				mn := util.SanitizeName(mv.Name)
-				key := fmt.Sprintf("%s-%s", rName, mn)
-				if key == is.Name {
+				if util.KServeInferenceServiceMapping(rm.Name, mv.Name, is.Name) {
 					// let's go with this one
 					var mas []openapi.ModelArtifact
 					mas, err = r.kfmr.ListModelArtifacts(mv.GetId())

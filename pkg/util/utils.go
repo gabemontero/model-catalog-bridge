@@ -108,3 +108,18 @@ func SanitizeName(name string) string {
 	return sanitizedName
 
 }
+
+func KServeInferenceServiceMapping(rName, mName, isName string) bool {
+	// we have to special case the names a bit before sanitzing when mapping to the inference service name to match
+	// what kubeflow / kserve does; our sanitize already converts dots to empty chars, but we also need to a) convert
+	// spaces to hyphens, and b) make everything lower case
+	replacer := strings.NewReplacer(" ", "-")
+	rName = strings.ToLower(rName)
+	rName = replacer.Replace(rName)
+	rName = SanitizeName(rName)
+	mName = strings.ToLower(mName)
+	mName = replacer.Replace(mName)
+	mName = SanitizeName(mName)
+	key := fmt.Sprintf("%s-%s", rName, mName)
+	return key == isName
+}
