@@ -86,10 +86,9 @@ export interface API {
     type: Type;
     /**
      * The URL that the model server's REST API is exposed over, how the model(s) are interacted
-     * with. An array of strings, to allow for both external and internal API URLs to be
-     * included.
+     * with
      */
-    url: string[];
+    url: string;
 }
 
 /**

@@ -67,9 +67,8 @@ type API struct {
 	// The type of API that the model server exposes                                                              
 	Type                                                                                        Type              `json:"type"`
 	// The URL that the model server's REST API is exposed over, how the model(s) are interacted                  
-	// with. An array of strings, to allow for both external and internal API URLs to be                          
-	// included.                                                                                                  
-	URL                                                                                         []string          `json:"url"`
+	// with                                                                                                       
+	URL                                                                                         string            `json:"url"`
 }
 
 // An AI model to be imported into the Backstage catalog
