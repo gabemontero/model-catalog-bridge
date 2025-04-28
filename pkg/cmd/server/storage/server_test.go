@@ -141,6 +141,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 		body           rest.PostBody
 		expectedErrMsg string
 		expectedSC     int
+		push           bool
 	}{
 		{
 			name:           "no query param",
@@ -158,12 +159,26 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 			reqURL:     url.URL{RawQuery: "key=mnist_v1"},
 			body:       rest.PostBody{Body: []byte("create")},
 			expectedSC: http.StatusCreated,
+			push:       true,
 		},
 		{
-			name:       "updated entry",
+			name:       "updated entry push",
 			reqURL:     url.URL{RawQuery: "key=mnist_v1"},
 			body:       rest.PostBody{Body: []byte("update")},
 			expectedSC: http.StatusOK,
+			push:       true,
+		},
+		{
+			name:       "new entry no push",
+			reqURL:     url.URL{RawQuery: "key=mnist_v2"},
+			body:       rest.PostBody{Body: []byte("create")},
+			expectedSC: http.StatusCreated,
+		},
+		{
+			name:       "updated entry no push ",
+			reqURL:     url.URL{RawQuery: "key=mnist_v2"},
+			body:       rest.PostBody{Body: []byte("update")},
+			expectedSC: http.StatusCreated,
 		},
 	} {
 		testWriter := testgin.NewTestResponseWriter()
@@ -182,6 +197,7 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 			pushedLocations: map[string]*types.StorageBody{},
 			locations:       location.SetupBridgeLocationRESTClient(brts),
 			bkstg:           (&bkstgclient.BackstageRESTClientWrapper{RESTClient: common.DC(), RootURL: bks.URL}),
+			pushToRHDH:      tc.push,
 		}
 
 		s.handleCatalogUpsertPost(ctx)
@@ -218,15 +234,17 @@ func Test_handleCatalogUpsertPost_handleCatalogCurrentKeySetPost_ConfigMap(t *te
 			// location service called
 			common.AssertEqual(t, true, found)
 
-			found = false
 			keyList := []any{}
-			backstageCallback.Range(func(key, value any) bool {
-				found = true
-				keyList = append(keyList, key)
-				return true
-			})
-			// backstage called
-			common.AssertEqual(t, true, found)
+			if tc.push {
+				found = false
+				backstageCallback.Range(func(key, value any) bool {
+					found = true
+					keyList = append(keyList, key)
+					return true
+				})
+				// backstage called
+				common.AssertEqual(t, true, found)
+			}
 
 			// clear out call cache for next check
 			for _, k := range keyList {

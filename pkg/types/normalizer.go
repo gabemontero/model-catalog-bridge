@@ -6,7 +6,14 @@ const (
 	CatalogInfoYamlFormat NormalizerFormat = "CatalogInfoYamlFormat"
 	JsonArrayForamt       NormalizerFormat = "JsonArrayFormat"
 
-	FormatEnvVar = "NORMALIZER_FORMAT"
+	LocationUrlEnvVar        = "BRIDGE_URL"
+	ModelRegistryRouteEnvVar = "MR_ROUTE"
+	BackstageUrlEnvVar       = "BKSTG_URL"
+	FormatEnvVar             = "NORMALIZER_FORMAT"
+	PollingIntEnvVar         = "POLLING_INTERVAL"
+
+	RHDHTokenEnvVar          = "RHDH_TOKEN"
+	ModelRegistryTokenEnvVar = "KFMR_TOKEN"
 
 	OwnerEnvVar     = "DEFAULT_OWNER"
 	LifecycleEnvVar = "DEFAULT_LIFECYCLE"
@@ -59,5 +66,5 @@ const (
 // These const represent the curated techdocs repos we provide for certain models in the RHOAI model catalog
 const (
 	Granite318bLabName     = "granite-31-8b-lab"
-	Granite318bLabTechDocs = "https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs"
+	Granite318bLabTechDocs = "https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs/tree/main"
 )

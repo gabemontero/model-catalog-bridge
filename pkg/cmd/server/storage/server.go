@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -31,11 +32,18 @@ type StorageRESTServer struct {
 	bkstg           rest.BackstageImport
 	bkstgToken      string
 	format          types.NormalizerFormat
+	pushToRHDH      bool
 }
 
 func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+	pushToRHDH := true
+	pushStr := os.Getenv(types.PushToRHDHEnvVar)
+	push, err := strconv.ParseBool(pushStr)
+	if err == nil && len(pushStr) > 0 {
+		pushToRHDH = push
+	}
 	s := &StorageRESTServer{
 		router:          r,
 		st:              st,
@@ -44,6 +52,7 @@ func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgT
 		locations:       bridgeclient.SetupBridgeLocationRESTClient(bridgeURL, bridgeToken),
 		bkstgToken:      bkstgToken,
 		format:          nf,
+		pushToRHDH:      pushToRHDH,
 	}
 	s.setupBkstg()
 	klog.Infof("NewStorageRESTServer")
@@ -294,12 +303,13 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		return
 	}
 
-	impResp := map[string]any{}
-	bkstAvailable := s.setupBkstg()
-	if !bkstAvailable {
+	switch {
+	case !s.setupBkstg():
 		klog.Warningf("Access to Backstage is not available so will not import location %s", sb.LocationId)
-	} else {
-
+	case !s.pushToRHDH:
+		klog.V(4).Info("directly importing locations to Backstage has been disabled")
+	default:
+		impResp := map[string]any{}
 		impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
@@ -322,6 +332,7 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		sb.LocationTarget = retTarget
 
 	}
+
 	// finally store in our storage layer with the id and cross reference location URL from backstage
 	err = s.st.Upsert(key, *sb)
 	if err != nil {
@@ -395,11 +406,11 @@ func GetRESTConfig() (*k8srest.Config, error) {
 
 func GetBackstageURL(restConfig *k8srest.Config) string {
 	r := strings.NewReplacer("\r", "", "\n", "")
-	bkstgURL := os.Getenv("BKSTG_URL")
+	bkstgURL := os.Getenv(types.BackstageUrlEnvVar)
 	bkstgURL = r.Replace(bkstgURL)
 	if len(bkstgURL) == 0 {
 		routeClient := util.GetRouteClient(restConfig)
-		ns := os.Getenv("POD_NAMESPACE")
+		ns := os.Getenv(util.PodNSEnvVar)
 		ns = r.Replace(ns)
 		routes, err := routeClient.Routes(ns).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
