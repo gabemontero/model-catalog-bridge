@@ -2,13 +2,14 @@ package kfmr
 
 import (
 	"fmt"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
-	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
+	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 )
 
 func SetupKubeflowTestRESTClient(ts *httptest.Server, cfg *config.Config) {

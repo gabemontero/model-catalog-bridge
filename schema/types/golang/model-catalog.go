@@ -85,6 +85,8 @@ type Model struct {
 	Ethics                                                                                       *string           `json:"ethics,omitempty"`
 	// The URL pointing to any specific documentation on how to use the model on the model server                  
 	HowToUseURL                                                                                  *string           `json:"howToUseURL,omitempty"`
+	// The license used by the model (e.g. Apache-2).                                                              
+	License                                                                                      *string           `json:"license,omitempty"`
 	// The lifecycle state of the model server API                                                                 
 	Lifecycle                                                                                    string            `json:"lifecycle"`
 	// The name of the model                                                                                       

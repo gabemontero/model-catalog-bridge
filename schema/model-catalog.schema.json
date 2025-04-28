@@ -167,6 +167,10 @@
                     "description": "Any ethical considerations for the model",
                     "type": "string"
                 },
+                "license": {
+                    "description": "The license used by the model (e.g. Apache-2).",
+                    "type": "string"
+                },
                 "howToUseURL": {
                     "description": "The URL pointing to any specific documentation on how to use the model on the model server",
                     "type": "string"

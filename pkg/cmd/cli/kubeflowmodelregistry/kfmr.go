@@ -126,6 +126,10 @@ func getTagsFromCustomProps(lastMod bool, props map[string]openapi.MetadataValue
 	regex, _ := regexp.Compile(tagRegexp)
 	for cpk, cpv := range props {
 		switch {
+		case cpk == brdgtypes.LicenseKey:
+			fallthrough
+		case cpk == brdgtypes.TechDocsKey:
+			klog.Info("Skip adding TechDocs or License key to tags")
 		case cpk == brdgtypes.RHOAIModelCatalogSourceModelVersion:
 			fallthrough
 		case cpk == brdgtypes.RHOAIModelCatalogSourceModelKey:
@@ -246,6 +250,13 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 			Tags:                mPop.GetTags(),
 			Training:            mPop.GetTraining(),
 			Usage:               mPop.GetUsage(),
+			License:             mPop.GetLicense(),
+		}
+
+		model.Annotations = make(map[string]string)
+		techDocsUrl := mPop.GetTechDocs()
+		if techDocsUrl != nil && *techDocsUrl != "" {
+			model.Annotations[brdgtypes.TechDocsKey] = *techDocsUrl
 		}
 		models = append(models, model)
 	}
@@ -430,6 +441,20 @@ func (m *ModelPopulator) GetTraining() *string {
 
 func (m *ModelPopulator) GetUsage() *string {
 	return m.getStringPropVal(brdgtypes.UsageKey)
+}
+
+func (m *ModelPopulator) GetLicense() *string {
+	return m.getStringPropVal(brdgtypes.LicenseKey)
+}
+
+func (m *ModelPopulator) GetTechDocs() *string {
+	techdocsUrl := m.getStringPropVal(brdgtypes.TechDocsKey)
+	if techdocsUrl == nil && strings.Contains(m.GetName(), brdgtypes.Granite318bLabName) {
+		granite31TechDocs := brdgtypes.Granite318bLabTechDocs
+		return &granite31TechDocs
+	} else {
+		return techdocsUrl
+	}
 }
 
 type ModelServerPopulator struct {

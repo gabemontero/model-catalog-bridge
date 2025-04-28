@@ -128,6 +128,10 @@ export interface Model {
      */
     howToUseURL?: string;
     /**
+     * The license used by the model (e.g. Apache-2).
+     */
+    license?: string;
+    /**
      * The lifecycle state of the model server API
      */
     lifecycle: string;
