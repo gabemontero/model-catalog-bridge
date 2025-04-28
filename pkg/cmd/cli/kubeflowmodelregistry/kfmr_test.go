@@ -31,6 +31,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 	support := "is this supported in a GA fashion, how to ask questions"
 	training := "how the model was trained and perhaps fine tuned"
 	usage := "some basic usage examples"
+	license := "Apache-2"
 	falsePtr := false
 	homepageURL := "https://mymodel.io/welcome"
 	defer ts.Close()
@@ -52,6 +53,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 						Support:     &support,
 						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
 						Training:    &training,
+						License:     &license,
 						Usage:       &usage,
 					},
 				},
@@ -61,6 +63,9 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 			outMc: &golang.ModelCatalog{
 				Models: []golang.Model{
 					{
+						Annotations: map[string]string{
+							"TechDocs": "https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs",
+						},
 						Description: "simple model that does not require a GPU",
 						Ethics:      &ethics,
 						HowToUseURL: &howTo,
@@ -71,6 +76,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
 						Training:    &training,
 						Usage:       &usage,
+						License:     &license,
 					},
 				},
 				ModelServer: &golang.ModelServer{
@@ -161,6 +167,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 				common.AssertEqual(t, tcModel.HowToUseURL == nil, outModel.HowToUseURL == nil)
 				common.AssertEqual(t, tcModel.Support == nil, outModel.Support == nil)
 				common.AssertEqual(t, tcModel.Training == nil, outModel.Training == nil)
+				common.AssertEqual(t, tcModel.License == nil, outModel.License == nil)
 				common.AssertEqual(t, tcModel.Usage == nil, outModel.Usage == nil)
 				if tcModel.Ethics != nil {
 					common.AssertEqual(t, *(tcModel.Ethics), *(outModel.Ethics))
@@ -176,6 +183,12 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 				}
 				if tcModel.Usage != nil {
 					common.AssertEqual(t, *(tcModel.Usage), *(outModel.Usage))
+				}
+				if tcModel.License != nil {
+					common.AssertEqual(t, *(tcModel.License), *(outModel.License))
+				}
+				if tcModel.Annotations != nil {
+					common.AssertEqual(t, tcModel.Annotations[types.TechDocsKey], outModel.Annotations[types.TechDocsKey])
 				}
 			}
 			if tc.outMc.ModelServer != nil {
@@ -450,7 +463,7 @@ models:
   owner: rhdh-rhoai-bridge
   tags:
   - _lastModified`
-	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","ethics":"some ethics related prose like you see on hugging face","howToUseURL":"some curl or python invocation examples","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","support":"is this supported in a GA fashion, how to ask questions","tags":["rhoai","v1","rhoai-model-registry","matteos-lightweight-test-model"],"training":"how the model was trained and perhaps fine tuned","usage":"some basic usage examples"}]}`
+	jsonListOutputJSON = `{"models":[{"artifactLocationURL":"https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx","description":"","ethics":"some ethics related prose like you see on hugging face","howToUseURL":"some curl or python invocation examples","lifecycle":"Lifecycle","name":"mnist-v1","owner":"rhdh-rhoai-bridge","support":"is this supported in a GA fashion, how to ask questions","tags":["rhoai","v1","rhoai-model-registry","matteos-lightweight-test-model"],"training":"how the model was trained and perhaps fine tuned","license": "Apache-2","usage":"some basic usage examples"}]}`
 	jsonListOutputYAML = `models:
 - artifactLocationURL: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx
   description: ""

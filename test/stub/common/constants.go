@@ -1650,6 +1650,16 @@ const (
                       "metadataType":"MetadataStringValue",
                       "string_value":"https://mymodel.io/welcome"
                   },
+                  "License":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"Apache-2"
+                  },
+                  "TechDocs":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs"
+                  },
                   "API Spec":
                   {
                       "metadataType":"MetadataStringValue",

@@ -53,6 +53,7 @@ const (
 	Owner          = "Owner"
 	Lifecycle      = "Lifecycle"
 	TechDocsKey    = "TechDocs"
+	LicenseKey     = "License"
 )
 
 // These const represent the curated techdocs repos we provide for certain models in the RHOAI model catalog
