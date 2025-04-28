@@ -110,7 +110,7 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 	if r.kfmrRoute == nil || len(r.kfmrRoute.Status.Ingress) == 0 {
 		var err error
 		rr := strings.NewReplacer("\r", "", "\n", "")
-		mrRoute := os.Getenv("MR_ROUTE")
+		mrRoute := os.Getenv(types2.ModelRegistryRouteEnvVar)
 		rr.Replace(mrRoute)
 
 		r.kfmrRoute, err = r.routeClient.Routes("istio-system").Get(ctx, mrRoute, metav1.GetOptions{})
@@ -122,7 +122,7 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 	if r.kfmrRoute != nil && len(r.kfmrRoute.Status.Ingress) > 0 && r.kfmr == nil {
 		//TODO fallback until we have the gitops style of KFMR permissions nailed down
 		rr := strings.NewReplacer("\r", "", "\n", "")
-		kfmrToken := os.Getenv("KFMR_TOKEN")
+		kfmrToken := os.Getenv(types2.ModelRegistryTokenEnvVar)
 		kfmrToken = rr.Replace(kfmrToken)
 		if len(kfmrToken) == 0 {
 			kfmrToken = r.k8sToken
@@ -142,10 +142,10 @@ func SetupController(ctx context.Context, mgr ctrl.Manager, cfg *rest.Config, pp
 	formatEnv := os.Getenv(types2.FormatEnvVar)
 	r := strings.NewReplacer("\r", "", "\n", "")
 	formatEnv = r.Replace(formatEnv)
-	storageURL := os.Getenv("STORAGE_URL")
+	storageURL := os.Getenv(types2.StorageUrlEnvVar)
 	storageURL = r.Replace(storageURL)
 	if len(storageURL) == 0 {
-		podIP := os.Getenv("POD_IP")
+		podIP := os.Getenv(util.PodIPEnvVar)
 		podIP = r.Replace(podIP)
 		storageURL = fmt.Sprintf("http://%s:7070", podIP)
 		klog.Infof("using %s for the storage URL per our sidecar hack", storageURL)
@@ -184,7 +184,7 @@ func SetupController(ctx context.Context, mgr ctrl.Manager, cfg *rest.Config, pp
 	reconciler.myNS = util.GetCurrentProject()
 
 	var err error
-	mrRoute := os.Getenv("MR_ROUTE")
+	mrRoute := os.Getenv(types2.ModelRegistryRouteEnvVar)
 	rr := strings.NewReplacer("\r", "", "\n", "")
 	mrRoute = rr.Replace(mrRoute)
 	reconciler.kfmrRoute, err = reconciler.routeClient.Routes("istio-system").Get(context.TODO(), mrRoute, metav1.GetOptions{})

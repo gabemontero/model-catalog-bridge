@@ -19,5 +19,12 @@ type StorageBody struct {
 
 type BridgeStorageType string
 
-const ConfigMapBridgeStorage BridgeStorageType = "ConfigMap"
-const GithubBridgeStorage BridgeStorageType = "Github"
+const (
+	ConfigMapBridgeStorage BridgeStorageType = "ConfigMap"
+	GithubBridgeStorage    BridgeStorageType = "Github"
+
+	StorageUrlEnvVar  = "STORAGE_URL"
+	StorageTypeEnvVar = "STORAGE_TYPE"
+
+	PushToRHDHEnvVar = "PUSH_TO_RHDH"
+)

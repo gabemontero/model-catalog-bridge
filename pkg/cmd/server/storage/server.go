@@ -395,11 +395,11 @@ func GetRESTConfig() (*k8srest.Config, error) {
 
 func GetBackstageURL(restConfig *k8srest.Config) string {
 	r := strings.NewReplacer("\r", "", "\n", "")
-	bkstgURL := os.Getenv("BKSTG_URL")
+	bkstgURL := os.Getenv(types.BackstageUrlEnvVar)
 	bkstgURL = r.Replace(bkstgURL)
 	if len(bkstgURL) == 0 {
 		routeClient := util.GetRouteClient(restConfig)
-		ns := os.Getenv("POD_NAMESPACE")
+		ns := os.Getenv(util.PodNSEnvVar)
 		ns = r.Replace(ns)
 		routes, err := routeClient.Routes(ns).List(context.Background(), metav1.ListOptions{})
 		if err != nil {

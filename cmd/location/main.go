@@ -15,12 +15,12 @@ func main() {
 	flagset := goflag.NewFlagSet("location", goflag.ContinueOnError)
 	klog.InitFlags(flagset)
 
-	st := os.Getenv("STORAGE_URL")
+	st := os.Getenv(types.StorageUrlEnvVar)
 	rr := strings.NewReplacer("\r", "", "\n", "")
 	st = rr.Replace(st)
 	if len(st) == 0 {
 		// try our RHDH sidecar container hack
-		podIP := os.Getenv("POD_IP")
+		podIP := os.Getenv(util.PodIPEnvVar)
 		st = fmt.Sprintf("http://%s:7070", podIP)
 		klog.Infof("using %s for the storage URL per our sidecar hack", st)
 	}

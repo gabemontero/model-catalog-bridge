@@ -6,7 +6,13 @@ const (
 	CatalogInfoYamlFormat NormalizerFormat = "CatalogInfoYamlFormat"
 	JsonArrayForamt       NormalizerFormat = "JsonArrayFormat"
 
-	FormatEnvVar = "NORMALIZER_FORMAT"
+	LocationUrlEnvVar        = "BRIDGE_URL"
+	ModelRegistryRouteEnvVar = "MR_ROUTE"
+	BackstageUrlEnvVar       = "BKSTG_URL"
+	FormatEnvVar             = "NORMALIZER_FORMAT"
+
+	RHDHTokenEnvVar          = "RHDH_TOKEN"
+	ModelRegistryTokenEnvVar = "KFMR_TOKEN"
 
 	OwnerEnvVar     = "DEFAULT_OWNER"
 	LifecycleEnvVar = "DEFAULT_LIFECYCLE"

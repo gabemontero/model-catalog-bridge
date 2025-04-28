@@ -22,15 +22,27 @@ import (
 	kcmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
+const (
+	PodIPEnvVar              = "POD_IP"
+	PodNSEnvVar              = "POD_NAMESPACE"
+	BrdgNSEnvVar             = "NAMESPACE"
+	KubeconfigEnvVar         = "KUBECONFIG"
+	K8sTokenEnvVar           = "K8S_TOKEN"
+	SvcHostEnvVar            = "KUBERNETES_SERVICE_HOST"
+	SvcPortEnvVar            = "KUBERNETES_SERVICE_PORT"
+	SidecarSecretTokenEnvVar = "token"
+	SidecarSecretCertEnvVar  = "ca.crt"
+)
+
 func GetK8sConfig(cfg *config.Config) (*rest.Config, error) {
 	if len(cfg.Kubeconfig) > 0 {
 		klog.Infof("loading k8s cfg from cfg setting for kubeconfig %s", cfg.Kubeconfig)
 		return clientcmd.BuildConfigFromFlags("", cfg.Kubeconfig)
 	}
 	// If an env variable is specified with the config locaiton, use that
-	if len(os.Getenv("KUBECONFIG")) > 0 {
+	if len(os.Getenv(KubeconfigEnvVar)) > 0 {
 		klog.Infof("loading k8s cfg from KUBECONFIG env var %s", cfg.Kubeconfig)
-		return clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+		return clientcmd.BuildConfigFromFlags("", os.Getenv(KubeconfigEnvVar))
 	}
 	klog.Info("using rest in cluster config")
 	// If no explicit location, try the in-cluster config
@@ -97,10 +109,10 @@ func GetCurrentProject() string {
 	currentProject = string(b)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error fetching token from k8s pod: %s", err.Error())
-		currentProject = os.Getenv("NAMESPACE")
+		currentProject = os.Getenv(BrdgNSEnvVar)
 	}
 	if len(currentProject) == 0 {
-		currentProject = os.Getenv("POD_NAMESPACE")
+		currentProject = os.Getenv(PodNSEnvVar)
 		klog.Infof("sidecar pod namespace is %s", currentProject)
 	}
 	return currentProject
@@ -112,7 +124,7 @@ func GetCurrentToken(cfg *rest.Config) string {
 		token := string(b)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error fetching token from k8s pod: %s", err.Error())
-			token = os.Getenv("K8S_TOKEN")
+			token = os.Getenv(K8sTokenEnvVar)
 		}
 		return token
 	}
@@ -129,14 +141,14 @@ func GetCurrentToken(cfg *rest.Config) string {
 // ephemeral "dynamic-plugins-root" volume to our sidecar, and then take the ca.crt env setting we get from
 // the bridge secret and store in a file we can seed into the TLS client config for our K8S REST Config.
 func InClusterConfigHackForRHDHSidecars() (*rest.Config, error) {
-	token := os.Getenv("token")
-	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	token := os.Getenv(SidecarSecretTokenEnvVar)
+	host, port := os.Getenv(SvcHostEnvVar), os.Getenv(SvcPortEnvVar)
 	if len(host) == 0 || len(port) == 0 || len(token) == 0 {
 		return nil, rest.ErrNotInCluster
 	}
 
 	tlsClientConfig := rest.TLSClientConfig{Insecure: true}
-	cacrt := os.Getenv("ca.crt")
+	cacrt := os.Getenv(SidecarSecretCertEnvVar)
 	if len(cacrt) > 0 {
 		fn := "/opt/app-root/src/dynamic-plugins-root/ca.crt"
 		file, err := os.Create(fn)

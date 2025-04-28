@@ -15,7 +15,7 @@ func main() {
 	flagset := goflag.NewFlagSet("storage-rest", goflag.ContinueOnError)
 	klog.InitFlags(flagset)
 
-	st := os.Getenv("STORAGE_TYPE")
+	st := os.Getenv(types.StorageTypeEnvVar)
 	storageType := types.BridgeStorageType(st)
 
 	bs := storage.NewBridgeStorage(storageType)
@@ -30,15 +30,14 @@ func main() {
 
 	r := strings.NewReplacer("\r", "", "\n", "")
 
-	//TODO maybe change to LOCATION_URL
-	bridgeURL := os.Getenv("BRIDGE_URL")
+	bridgeURL := os.Getenv(types.LocationUrlEnvVar)
 	bridgeURL = r.Replace(bridgeURL)
 	bridgeToken := util.GetCurrentToken(restConfig)
 
-	bkstgToken := os.Getenv("RHDH_TOKEN")
+	bkstgToken := os.Getenv(types.RHDHTokenEnvVar)
 	bkstgToken = r.Replace(bkstgToken)
 
-	podIP := os.Getenv("POD_IP")
+	podIP := os.Getenv(util.PodIPEnvVar)
 	podIP = r.Replace(podIP)
 	klog.Infof("pod IP from env var is %s", podIP)
 	if len(podIP) > 0 {
