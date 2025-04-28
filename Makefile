@@ -21,6 +21,7 @@ RHOAI_NORMALIZER_TAG ?= latest
 STORAGE_REST_IMAGE ?= quay.io/redhat-ai-dev/model-catalog-storage-rest
 STORAGE_REST_TAG ?= latest
 
+QUICKTYPE_VERSION ?= 23.0.175
 .EXPORT_ALL_VARIABLES:
 
 
@@ -42,7 +43,7 @@ test-unit:
 	go test $(GO_FLAGS) $(GO_TEST_FLAGS) ./cmd/... ./pkg/...
 
 install-quicktype:
-	npm install -g quicktype
+	npm install -g quicktype@${QUICKTYPE_VERSION}
 
 generate-types-all: generate-typescript generate-golang
 
