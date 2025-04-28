@@ -89,34 +89,36 @@ func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.Regi
 	return rmArray, mvsMap, masMap, nil
 }
 
-func callKubeflowREST(id string, kfmr *KubeFlowRESTClientWrapper) (mvs []openapi.ModelVersion, ma map[string][]openapi.ModelArtifact, err error) {
-	mvs, err = kfmr.ListModelVersions(id)
+func callKubeflowREST(id string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.ModelVersion, map[string][]openapi.ModelArtifact, error) {
+	finalMVS := []openapi.ModelVersion{}
+	mvs, err := kfmr.ListModelVersions(id)
 	if err != nil {
 		klog.Errorf("ERROR: error list model versions for %s: %s", id, err.Error())
-		return
+		return nil, nil, err
 	}
-	ma = map[string][]openapi.ModelArtifact{}
+	ma := map[string][]openapi.ModelArtifact{}
 	for _, mv := range mvs {
 		if mv.State != nil && *mv.State == openapi.MODELVERSIONSTATE_ARCHIVED {
 			klog.V(4).Infof("callKubeflowREST skipping archived model version %s", mv.Name)
 			continue
 		}
+		finalMVS = append(finalMVS, mv)
 		var v []openapi.ModelArtifact
 		v, err = kfmr.ListModelArtifacts(*mv.Id)
 		if err != nil {
 			klog.Errorf("ERROR error list model artifacts for %s:%s: %s", id, *mv.Id, err.Error())
-			return
+			return finalMVS, ma, err
 		}
 		if len(v) == 0 {
 			v, err = kfmr.ListModelArtifacts(id)
 			if err != nil {
 				klog.Errorf("ERROR error list model artifacts for %s:%s: %s", id, *mv.Id, err.Error())
-				return
+				return finalMVS, ma, err
 			}
 		}
 		ma[*mv.Id] = v
 	}
-	return
+	return finalMVS, ma, nil
 }
 
 func getTagsFromCustomProps(lastMod bool, props map[string]openapi.MetadataValue) map[string]string {
@@ -221,7 +223,8 @@ type ModelCatalogPopulator struct {
 func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 	models := []golang.Model{}
 	for mvidx, mv := range m.ModelVersions {
-		mPop := m.MPops[mvidx]
+		mPop := ModelPopulator{CommonSchemaPopulator: CommonSchemaPopulator{m.ComponentPopulator}}
+		m.MPops = append(m.MPops, &mPop)
 		mPop.MVIndex = mvidx
 		mas := m.ModelArtifacts[mv.GetId()]
 		for maidx, ma := range mas {
@@ -713,8 +716,6 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 			ApiPop:                ModelServerAPIPopulator{CommonSchemaPopulator: CommonSchemaPopulator{compPop}},
 		}
 		mcPop.MSPop = &msPop
-		mPop := ModelPopulator{CommonSchemaPopulator: CommonSchemaPopulator{compPop}}
-		mcPop.MPops = []*ModelPopulator{&mPop}
 		return backstage.PrintModelCatalogPopulator(&mcPop, writer)
 	case brdgtypes.CatalogInfoYamlFormat:
 		fallthrough
