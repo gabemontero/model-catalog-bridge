@@ -10,6 +10,7 @@ const (
 	ModelRegistryRouteEnvVar = "MR_ROUTE"
 	BackstageUrlEnvVar       = "BKSTG_URL"
 	FormatEnvVar             = "NORMALIZER_FORMAT"
+	PollingIntEnvVar         = "POLLING_INTERVAL"
 
 	RHDHTokenEnvVar          = "RHDH_TOKEN"
 	ModelRegistryTokenEnvVar = "KFMR_TOKEN"

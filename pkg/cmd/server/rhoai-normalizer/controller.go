@@ -158,6 +158,13 @@ func SetupController(ctx context.Context, mgr ctrl.Manager, cfg *rest.Config, pp
 		routeClient:   routeclient.NewForConfigOrDie(cfg),
 		storage:       storage.SetupBridgeStorageRESTClient(storageURL, util.GetCurrentToken(cfg)),
 		format:        types2.NormalizerFormat(formatEnv),
+		pollingInt:    2 * time.Minute,
+	}
+
+	polling := os.Getenv(types2.PollingIntEnvVar)
+	pollingDuration, err := time.ParseDuration(polling)
+	if err == nil && len(polling) > 0 {
+		reconciler.pollingInt = pollingDuration
 	}
 
 	defaultOwner := os.Getenv(types2.OwnerEnvVar)
@@ -183,7 +190,6 @@ func SetupController(ctx context.Context, mgr ctrl.Manager, cfg *rest.Config, pp
 
 	reconciler.myNS = util.GetCurrentProject()
 
-	var err error
 	mrRoute := os.Getenv(types2.ModelRegistryRouteEnvVar)
 	rr := strings.NewReplacer("\r", "", "\n", "")
 	mrRoute = rr.Replace(mrRoute)
@@ -250,6 +256,7 @@ type RHOAINormalizerReconcile struct {
 	format           types2.NormalizerFormat
 	defaultOwner     string
 	defaultLifecycle string
+	pollingInt       time.Duration
 }
 
 func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -479,7 +486,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 // fine grained on what we attempt to relist vs. just increasing the frequency of all the controller's watches
 
 func (r *RHOAINormalizerReconcile) Start(ctx context.Context) error {
-	eventTicker := time.NewTicker(2 * time.Minute)
+	eventTicker := time.NewTicker(r.pollingInt)
 	for {
 		select {
 		case <-eventTicker.C:
