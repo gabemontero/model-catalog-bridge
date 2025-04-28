@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -452,9 +453,19 @@ func (m *ModelPopulator) GetTechDocs() *string {
 	if techdocsUrl == nil && strings.Contains(m.GetName(), brdgtypes.Granite318bLabName) {
 		granite31TechDocs := brdgtypes.Granite318bLabTechDocs
 		return &granite31TechDocs
-	} else {
-		return techdocsUrl
+	} else if techdocsUrl != nil {
+		u, err := url.Parse(*techdocsUrl)
+		switch {
+		case err != nil:
+			fallthrough
+		case u == nil:
+			fallthrough
+		case u != nil && (u.Scheme != "http" && u.Scheme != "https"):
+			klog.Errorf("ignoring techdoc URL since there is either an error or bad scheme for techdoc url %v: err %v, url %v", techdocsUrl, err, u)
+			return nil
+		}
 	}
+	return techdocsUrl
 }
 
 type ModelServerPopulator struct {
