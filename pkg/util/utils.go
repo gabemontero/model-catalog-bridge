@@ -89,6 +89,9 @@ func BuildImportKeyAndURI(seg1, seg2 string, format types.NormalizerFormat) (str
 }
 
 func SanitizeModelVersion(mv string) string {
+	replacer := strings.NewReplacer(" ", "-")
+	mv = strings.ToLower(mv)
+	mv = replacer.Replace(mv)
 	return strings.ToLower(SanitizeName(mv))
 }
 func SanitizeName(name string) string {
