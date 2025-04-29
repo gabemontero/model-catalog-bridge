@@ -3,16 +3,17 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"io"
-	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/klog/v2"
 	"os"
 	"os/signal"
 	"regexp"
-	"sigs.k8s.io/yaml"
 	"strings"
 	"syscall"
+
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -87,6 +88,12 @@ func BuildImportKeyAndURI(seg1, seg2 string, format types.NormalizerFormat) (str
 	return fmt.Sprintf("%s_%s", seg1, seg2), fmt.Sprintf("/%s/%s/%s", seg1, seg2, fn)
 }
 
+func SanitizeModelVersion(mv string) string {
+	replacer := strings.NewReplacer(" ", "-")
+	mv = strings.ToLower(mv)
+	mv = replacer.Replace(mv)
+	return strings.ToLower(SanitizeName(mv))
+}
 func SanitizeName(name string) string {
 	sanitizedName := name
 
