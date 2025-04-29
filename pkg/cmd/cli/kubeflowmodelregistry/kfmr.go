@@ -244,7 +244,7 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 			Description:         mPop.GetDescription(),
 			Ethics:              mPop.GetEthics(),
 			HowToUseURL:         mPop.GetHowToUseURL(),
-			Lifecycle:           mPop.Lifecycle,
+			Lifecycle:           mPop.GetLifecycle(),
 			Name:                mPop.GetName(),
 			Owner:               mPop.GetOwner(),
 			Support:             mPop.GetSupport(),
