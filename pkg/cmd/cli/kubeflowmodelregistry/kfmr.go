@@ -341,7 +341,7 @@ type ModelPopulator struct {
 func (m *ModelPopulator) GetName() string {
 	if len(m.ModelVersions) > m.MVIndex {
 		mv := m.ModelVersions[m.MVIndex]
-		return util.SanitizeName(m.RegisteredModel.Name) + "-" + util.SanitizeName(mv.GetName())
+		return util.SanitizeName(m.RegisteredModel.Name) + "-" + util.SanitizeModelVersion(mv.GetName())
 	}
 	return ""
 }
