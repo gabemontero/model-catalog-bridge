@@ -32,6 +32,7 @@ func main() {
 
 	bridgeURL := os.Getenv(types.LocationUrlEnvVar)
 	bridgeURL = r.Replace(bridgeURL)
+	klog.Infof("%s set to %s", types.LocationUrlEnvVar, bridgeURL)
 	bridgeToken := util.GetCurrentToken(restConfig)
 
 	bkstgToken := os.Getenv(types.RHDHTokenEnvVar)
@@ -40,9 +41,10 @@ func main() {
 	podIP := os.Getenv(util.PodIPEnvVar)
 	podIP = r.Replace(podIP)
 	klog.Infof("pod IP from env var is %s", podIP)
-	if len(podIP) > 0 {
+	if len(podIP) > 0 && len(bridgeURL) == 0 {
 		// neither inter-Pod nor service IPs worked for backstage access in testing; have to use the route
 		bridgeURL = fmt.Sprintf("http://%s:9090", podIP)
+		klog.Infof("using %s env var vs. %s for location service access", util.PodIPEnvVar, types.LocationUrlEnvVar)
 	}
 
 	nfstr := os.Getenv(types.FormatEnvVar)
