@@ -61,6 +61,10 @@ func CreateBackstageServerWithCallbackMap(callback *sync.Map, t *testing.T) *htt
 					_, _ = w.Write([]byte(fmt.Sprintf(common.TestJSONStringOneLinePlusQueryParam, r.URL.Query().Encode())))
 				}
 
+			case strings.Contains(r.URL.Path, fmt.Sprintf("%s/%s", rest.LOCATION_URI, "e83bc2d8-0f1c-49f2-b65b-8bfbbbe29ae2")):
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(common.LocationJson))
+
 			case strings.HasPrefix(r.URL.Path, rest.LOCATION_URI):
 				path := strings.TrimPrefix(r.URL.Path, rest.LOCATION_URI)
 				w.Header().Set("Content-Type", "application/json")

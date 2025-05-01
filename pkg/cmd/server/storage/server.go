@@ -295,6 +295,26 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		c.Error(fmt.Errorf(msg))
 	}
 
+	if alreadyPushed {
+		// now see if backstage has been recycled to the point where a location we imported in the past
+		// is no longer present
+		var locationMap map[string]any
+		locationMap, err = s.bkstg.GetLocation(sb.LocationId)
+		switch {
+		case err != nil || locationMap == nil || len(locationMap) == 0:
+			klog.Infof("location %s no longer is present in backstage: %v, %v", sb.LocationId, err, locationMap)
+			alreadyPushed = false
+		default:
+			locID, locTarget, locOK := rest.ParseImportLocationMap(locationMap)
+			if !locOK {
+				klog.Infof("location %s no longer is present in backstage: %v, %v", sb.LocationId, err, locationMap)
+				alreadyPushed = false
+			} else {
+				klog.V(4).Infof("location id %s for target %s still present in backstage", locID, locTarget)
+			}
+		}
+
+	}
 	// if we have not previously pushed to backstage, do so now;
 	// we use a sync map here in case our store implementation does not provide atomic updates
 	if alreadyPushed {
