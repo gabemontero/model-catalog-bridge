@@ -14,6 +14,13 @@ data:
       - dynamic-plugins.default.yaml
     # The following specifies that the model catalog plugin (red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog)
     # contained within the OCI archive (quay.io/redhat-ai-dev/ai-integrations-rhdh:latest) should be installed into RHDH
+    # officially built images are at oci://quay.io/redhat-ai-dev/ai-integrations-rhdh:latest but 
+    # the 'consolidate-ai-catalog-extensions' branch from the gabemontero fork of the plugins produced these plugin images 
+    # allow for push import with sidecars
     plugins:
-      - package: oci://quay.io/redhat-ai-dev/ai-integrations-rhdh:latest!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog
+      - package: oci://quay.io/gabemontero/ai-experience:v5!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog
+        disabled: false
+      - package: oci://quay.io/gabemontero/ai-experience:v5!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog-location-extension
+        disabled: false
+      - package: oci://quay.io/gabemontero/ai-experience:v5!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog-reader
         disabled: false

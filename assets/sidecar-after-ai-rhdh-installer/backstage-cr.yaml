@@ -74,6 +74,10 @@ spec:
                     value: JsonArrayFormat
                   - name: STORAGE_TYPE
                     value: ConfigMap
+                  - name: PUSH_TO_RHDH
+                    value: true
+                  - name: BRIDGE_URL
+                    value: http://localhost:9090
                   - name: POD_IP
                     valueFrom:
                       fieldRef:
