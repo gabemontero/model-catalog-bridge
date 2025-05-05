@@ -8,7 +8,10 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"net/http"
 	nurl "net/url"
 	"os"
 )
@@ -84,6 +87,15 @@ func (k *BackstageRESTClientWrapper) processBody(resp *resty.Response) (map[stri
 	return retJSON, err
 }
 
+func (k *BackstageRESTClientWrapper) processBodyArray(resp *resty.Response) ([]map[string]any, error) {
+	retJSON := make([]map[string]any, 5)
+	err := json.Unmarshal(resp.Body(), &retJSON)
+	if err != nil {
+		return nil, fmt.Errorf("json unmarshall error for %s: %s\n", resp.Body(), err.Error())
+	}
+	return retJSON, err
+}
+
 func (k *BackstageRESTClientWrapper) postToBackstage(url string, body interface{}) (map[string]any, error) {
 	resp, err := backstageRESTClient.RESTClient.R().SetAuthToken(k.Token).SetBody(body).SetHeader("Accept", "application/json").Post(url)
 	if err != nil {
@@ -91,6 +103,19 @@ func (k *BackstageRESTClientWrapper) postToBackstage(url string, body interface{
 	}
 	rc := resp.StatusCode()
 	if rc != 200 && rc != 201 {
+		var ok bool
+		err, ok = resp.Request.Error.(error)
+		if ok && err != nil {
+			return nil, err
+		}
+		if rc == 409 {
+			err = &errors.StatusError{metav1.Status{
+				Status: metav1.StatusFailure,
+				Code:   http.StatusConflict,
+				Reason: metav1.StatusReasonConflict,
+			}}
+			return nil, err
+		}
 		return nil, fmt.Errorf("post for %s rc %d body %s\n", url, rc, resp.String())
 	} else {
 		klog.V(4).Infof("post for %s returned ok\n", url)

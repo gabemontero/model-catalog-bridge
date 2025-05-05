@@ -17,11 +17,22 @@ type BackstageImport interface {
 	ImportLocation(url string) (map[string]any, error)
 	DeleteLocation(id string) (string, error)
 	GetLocation(id string) (map[string]any, error)
+	ListLocations_Raw() ([]map[string]any, error)
 }
 
 func ParseImportLocationMap(retJSON map[string]any) (id string, target string, ok bool) {
 	var location interface{}
 	location, ok = retJSON["location"]
+	if ok {
+		var locationMap map[string]interface{}
+		locationMap, ok = location.(map[string]interface{})
+		if ok {
+			id = fmt.Sprintf("%s", locationMap["id"])
+			target = fmt.Sprintf("%s", locationMap["target"])
+			return id, target, ok
+		}
+	}
+	location, ok = retJSON["data"]
 	if ok {
 		var locationMap map[string]interface{}
 		locationMap, ok = location.(map[string]interface{})

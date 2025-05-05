@@ -12,6 +12,7 @@ import (
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8srest "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -299,6 +300,7 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		// now see if backstage has been recycled to the point where a location we imported in the past
 		// is no longer present
 		var locationMap map[string]any
+		klog.Infof("GGMGGM seeing if location id %s exists", sb.LocationId)
 		locationMap, err = s.bkstg.GetLocation(sb.LocationId)
 		switch {
 		case err != nil || locationMap == nil || len(locationMap) == 0:
@@ -330,27 +332,54 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 		klog.V(4).Info("directly importing locations to Backstage has been disabled")
 	default:
 		impResp := map[string]any{}
+		klog.Infof("GGMGGM calling import location on %s with uri %s", s.locations.HostURL, uri)
 		impResp, err = s.bkstg.ImportLocation(s.locations.HostURL + uri)
-		if err != nil {
+		switch {
+		case err != nil && errors.IsConflict(err):
+			klog.Infof("GGMGGM conflict error in import of %s where location ID was %s so updating location id in storage", s.locations.HostURL+uri, sb.LocationId)
+			// find location and update location ID in our storage
+			var locationMaps []map[string]any
+			locationMaps, err = s.bkstg.ListLocations_Raw()
+			switch {
+			case err != nil || locationMaps == nil || len(locationMaps) == 0:
+				klog.Infof("location %s no longer is present in backstage: %v, %v", sb.LocationId, err, locationMaps)
+			default:
+				for _, locationMap := range locationMaps {
+					locID, locTarget, locOK := rest.ParseImportLocationMap(locationMap)
+					if !locOK {
+						klog.V(4).Infof("location %s no longer is present in backstage: %v, %v", sb.LocationId, err, locationMap)
+						continue
+					} else {
+						if locTarget == s.locations.HostURL+uri {
+							klog.Infof("location %s is switching location id to %s", locTarget, locID)
+							sb.LocationId = locID
+							sb.LocationTarget = locTarget
+							break
+						}
+					}
+				}
+			}
+		case err != nil:
 			c.Status(http.StatusInternalServerError)
 			msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
 			klog.Errorf(msg)
 			c.Error(fmt.Errorf(msg))
 			return
-		}
-		retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
-		if !rok {
-			//TODO perhaps delete location on the backstage side as well as our cache
-			c.Status(http.StatusBadRequest)
-			msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
-			klog.Errorf(msg)
-			c.Error(fmt.Errorf(msg))
-			return
-		}
+		default:
+			retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
+			if !rok {
+				//TODO perhaps delete location on the backstage side as well as our cache
+				c.Status(http.StatusBadRequest)
+				msg = fmt.Sprintf("parsing of import location return had an issue: %#v", impResp)
+				klog.Errorf(msg)
+				c.Error(fmt.Errorf(msg))
+				return
+			}
 
-		sb.LocationId = retID
-		sb.LocationTarget = retTarget
+			sb.LocationId = retID
+			sb.LocationTarget = retTarget
 
+		}
 	}
 
 	// finally store in our storage layer with the id and cross reference location URL from backstage

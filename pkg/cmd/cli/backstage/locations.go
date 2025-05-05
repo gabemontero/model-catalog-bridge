@@ -36,6 +36,15 @@ func (b *BackstageRESTClientWrapper) GetLocations(args ...string) (string, error
 	return buffer.String(), nil
 }
 
+func (b *BackstageRESTClientWrapper) ListLocations_Raw() ([]map[string]any, error) {
+	url := b.RootURL + rest.LOCATION_URI
+	resp, err := backstageRESTClient.RESTClient.R().SetAuthToken(b.Token).SetHeader("Accept", "application/json").Get(url)
+	if err != nil {
+		return nil, err
+	}
+	return b.processBodyArray(resp)
+}
+
 func (b *BackstageRESTClientWrapper) GetLocation(id string) (map[string]any, error) {
 	url := b.RootURL + rest.LOCATION_URI + "/" + id
 	resp, err := backstageRESTClient.RESTClient.R().SetAuthToken(b.Token).SetHeader("Accept", "application/json").Get(url)
