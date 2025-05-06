@@ -810,6 +810,9 @@ type CommonPopulator struct {
 }
 
 func (pop *CommonPopulator) GetOwner() string {
+	if len(pop.Owner) != 0 {
+		return pop.Owner
+	}
 	if pop.RegisteredModel.Owner != nil {
 		return util.SanitizeName(*pop.RegisteredModel.Owner)
 	}

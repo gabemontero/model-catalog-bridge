@@ -516,7 +516,7 @@ spec:
   - resource:v1
   - api:model-1-v1-artifact
   lifecycle: Lifecycle
-  owner: user:kubeadmin
+  owner: user:Owner
   profile:
     displayName: model-1
   type: model-server
@@ -537,7 +537,7 @@ spec:
   dependencyOf:
   - component:model-1
   lifecycle: Lifecycle
-  owner: user:kubeadmin
+  owner: user:Owner
   profile:
     displayName: v1
   type: ai-model
@@ -554,7 +554,7 @@ spec:
   dependencyOf:
   - component:model-1
   lifecycle: Lifecycle
-  owner: user:kubeadmin
+  owner: user:Owner
   profile:
     displayName: model-1
   type: unknown
