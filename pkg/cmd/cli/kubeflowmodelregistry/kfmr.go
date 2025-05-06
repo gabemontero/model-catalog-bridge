@@ -769,6 +769,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		resPop.ModelVersions = mvs
 		resPop.Kis = is
 		resPop.CtrlClient = client
+		resPop.Ctx = ctx
 		for _, mv := range mvs {
 			resPop.ModelVersion = &mv
 			m, _ := mas[*mv.Id]
@@ -788,6 +789,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		apiPop.InferenceServices = isl
 		apiPop.Kis = is
 		apiPop.CtrlClient = client
+		apiPop.Ctx = ctx
 		return backstage.PrintAPI(&apiPop, writer)
 	}
 
