@@ -4,270 +4,210 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	fakeservingv1beta1 "github.com/kserve/kserve/pkg/client/clientset/versioned/fake"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/apis"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 )
 
-func setupConfig(cfg *config.Config, objs []serverapiv1beta1.InferenceService) {
+func setupConfig(cfg *config.Config, obj serverapiv1beta1.InferenceService) {
 	cfg.ServingClient = fakeservingv1beta1.NewSimpleClientset().ServingV1beta1()
-	for _, obj := range objs {
-		cfg.ServingClient.InferenceServices(obj.Namespace).Create(context.TODO(), &obj, metav1.CreateOptions{})
-		cfg.Namespace = obj.Namespace
-	}
+	cfg.ServingClient.InferenceServices(obj.Namespace).Create(context.TODO(), &obj, metav1.CreateOptions{})
+	cfg.Namespace = obj.Namespace
+
 }
 
 func TestKserveBackstagePrinters(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = serverapiv1beta1.AddToScheme(scheme)
 	for _, tc := range []struct {
 		name string
 		args []string
-		// we do output compare in chunks as ranges over the components status map are non-deterministic wrt order
-		outStr []string
-		is     []serverapiv1beta1.InferenceService
+		is   serverapiv1beta1.InferenceService
+		mc   *golang.ModelCatalog
 	}{
-		{
-			name: "Owner and Lifecycle but no data",
-			args: []string{"Owner", "Lifecycle"},
-		},
-		{
-			name: "Owner and Lifecycle and data but no url",
-			args: []string{"Owner", "Lifecycle"},
-			is: []serverapiv1beta1.InferenceService{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-1",
-					},
-				},
-			},
-			outStr: []string{urlNotSet},
-		},
 		{
 			name: "Owner and Lifecycle set and data and url",
 			args: []string{"Owner", "Lifecycle"},
-			is: []serverapiv1beta1.InferenceService{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-1",
-					},
-					Status: serverapiv1beta1.InferenceServiceStatus{
-						URL: &apis.URL{
-							Scheme: "https",
-							Host:   "kserve.com",
-						},
+			is: serverapiv1beta1.InferenceService{
+
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "InferSvc-1",
+				},
+				Status: serverapiv1beta1.InferenceServiceStatus{
+					URL: &apis.URL{
+						Scheme: "https",
+						Host:   "kserve.com",
 					},
 				},
 			},
-			outStr: []string{urlSet},
+			mc: &golang.ModelCatalog{
+
+				Models: []golang.Model{
+					{
+						Name:        "default-InferSvc-1",
+						Description: "",
+						Lifecycle:   "Lifecycle",
+						Owner:       "Owner",
+					},
+				},
+				ModelServer: &golang.ModelServer{
+					API: &golang.API{
+						Spec: "TBD",
+						Type: "openapi",
+						URL:  "https://kserve.com",
+					},
+					Authentication: &falseVal,
+					Description:    "",
+					Lifecycle:      "Lifecycle",
+					Name:           "default-InferSvc-1",
+					Owner:          "Owner",
+				},
+			},
 		},
 		{
 			name: "use everything including bunch of tags",
 			args: []string{"Owner", "Lifecycle"},
-			is: []serverapiv1beta1.InferenceService{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-1",
-					},
-					Status: serverapiv1beta1.InferenceServiceStatus{
-						URL: &apis.URL{
-							Scheme: "https",
-							Host:   "kserve.com",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-2",
-					},
-					Spec: serverapiv1beta1.InferenceServiceSpec{
-						Predictor: serverapiv1beta1.PredictorSpec{
-							SKLearn:     &serverapiv1beta1.SKLearnSpec{},
-							XGBoost:     &serverapiv1beta1.XGBoostSpec{},
-							Tensorflow:  &serverapiv1beta1.TFServingSpec{},
-							PyTorch:     &serverapiv1beta1.TorchServeSpec{},
-							Triton:      &serverapiv1beta1.TritonSpec{},
-							ONNX:        &serverapiv1beta1.ONNXRuntimeSpec{},
-							HuggingFace: &serverapiv1beta1.HuggingFaceRuntimeSpec{},
-							PMML:        &serverapiv1beta1.PMMLSpec{},
-							LightGBM:    &serverapiv1beta1.LightGBMSpec{},
-							Paddle:      &serverapiv1beta1.PaddleServerSpec{},
-							Model:       &serverapiv1beta1.ModelSpec{ModelFormat: serverapiv1beta1.ModelFormat{Name: "f1", Version: &version}},
-						},
-						Explainer: &serverapiv1beta1.ExplainerSpec{
-							ART: &serverapiv1beta1.ARTExplainerSpec{Type: serverapiv1beta1.ARTSquareAttackExplainer},
-						},
-					},
-					Status: serverapiv1beta1.InferenceServiceStatus{
-						URL: &apis.URL{
-							Scheme: "https",
-							Host:   "kserve.com",
-						},
-						Components: map[serverapiv1beta1.ComponentType]serverapiv1beta1.ComponentStatusSpec{
-							serverapiv1beta1.PredictorComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
-							},
-							serverapiv1beta1.ExplainerComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
-							},
-							serverapiv1beta1.TransformerComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
-							},
-						},
+			is: serverapiv1beta1.InferenceService{
+
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "InferSvc-2",
+					Annotations: map[string]string{
+						types.AnnotationPrefix + fixKeyForAnnotation(types.EthicsKey):      types.EthicsKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.HowToUseKey):    types.HowToUseKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.SupportKey):     types.SupportKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.TrainingKey):    types.TrainingKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.UsageKey):       types.UsageKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.HomepageURLKey): types.HomepageURLKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.APISpecKey):     types.APISpecKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.APITypeKey):     string(golang.Openapi),
+						types.AnnotationPrefix + fixKeyForAnnotation(types.Owner):          types.Owner,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.Lifecycle):      types.Lifecycle,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.TechDocsKey):    types.TechDocsKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.LicenseKey):     types.LicenseKey,
+						types.AnnotationPrefix + fixKeyForAnnotation(types.DescriptionKey): types.DescriptionKey,
 					},
 				},
-			},
-			outStr: []string{urlSet, description2, link21, link22, link23, link24, link25, link26, link27, link28, link29, link30, link31, link32, link33, nameTags2, compSpec2, resourceSpec2, apiSpec2},
-		},
-		{
-			name: "fetch 2 specific inferenceservices",
-			args: []string{"Owner", "Lifecycle", "InferSvc-1", "InferSvc-2"},
-			is: []serverapiv1beta1.InferenceService{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-1",
+				Spec: serverapiv1beta1.InferenceServiceSpec{
+					Predictor: serverapiv1beta1.PredictorSpec{
+						SKLearn:     &serverapiv1beta1.SKLearnSpec{},
+						XGBoost:     &serverapiv1beta1.XGBoostSpec{},
+						Tensorflow:  &serverapiv1beta1.TFServingSpec{},
+						PyTorch:     &serverapiv1beta1.TorchServeSpec{},
+						Triton:      &serverapiv1beta1.TritonSpec{},
+						ONNX:        &serverapiv1beta1.ONNXRuntimeSpec{},
+						HuggingFace: &serverapiv1beta1.HuggingFaceRuntimeSpec{},
+						PMML:        &serverapiv1beta1.PMMLSpec{},
+						LightGBM:    &serverapiv1beta1.LightGBMSpec{},
+						Paddle:      &serverapiv1beta1.PaddleServerSpec{},
+						Model:       &serverapiv1beta1.ModelSpec{ModelFormat: serverapiv1beta1.ModelFormat{Name: "f1", Version: &version}},
 					},
-					Status: serverapiv1beta1.InferenceServiceStatus{
-						URL: &apis.URL{
-							Scheme: "https",
-							Host:   "kserve.com",
-						},
+					Explainer: &serverapiv1beta1.ExplainerSpec{
+						ART: &serverapiv1beta1.ARTExplainerSpec{Type: serverapiv1beta1.ARTSquareAttackExplainer},
 					},
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "InferSvc-2",
+				Status: serverapiv1beta1.InferenceServiceStatus{
+					URL: &apis.URL{
+						Scheme: "https",
+						Host:   "kserve.com",
 					},
-					Spec: serverapiv1beta1.InferenceServiceSpec{
-						Predictor: serverapiv1beta1.PredictorSpec{
-							SKLearn:     &serverapiv1beta1.SKLearnSpec{},
-							XGBoost:     &serverapiv1beta1.XGBoostSpec{},
-							Tensorflow:  &serverapiv1beta1.TFServingSpec{},
-							PyTorch:     &serverapiv1beta1.TorchServeSpec{},
-							Triton:      &serverapiv1beta1.TritonSpec{},
-							ONNX:        &serverapiv1beta1.ONNXRuntimeSpec{},
-							HuggingFace: &serverapiv1beta1.HuggingFaceRuntimeSpec{},
-							PMML:        &serverapiv1beta1.PMMLSpec{},
-							LightGBM:    &serverapiv1beta1.LightGBMSpec{},
-							Paddle:      &serverapiv1beta1.PaddleServerSpec{},
-							Model:       &serverapiv1beta1.ModelSpec{ModelFormat: serverapiv1beta1.ModelFormat{Name: "f1", Version: &version}},
-						},
-						Explainer: &serverapiv1beta1.ExplainerSpec{
-							ART: &serverapiv1beta1.ARTExplainerSpec{Type: serverapiv1beta1.ARTSquareAttackExplainer},
-						},
-					},
-					Status: serverapiv1beta1.InferenceServiceStatus{
-						URL: &apis.URL{
-							Scheme: "https",
-							Host:   "kserve.com",
-						},
-						Components: map[serverapiv1beta1.ComponentType]serverapiv1beta1.ComponentStatusSpec{
-							serverapiv1beta1.PredictorComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
+					Components: map[serverapiv1beta1.ComponentType]serverapiv1beta1.ComponentStatusSpec{
+						serverapiv1beta1.PredictorComponent: {
+							URL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "docs",
 							},
-							serverapiv1beta1.ExplainerComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
+							RestURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "rest",
 							},
-							serverapiv1beta1.TransformerComponent: {
-								URL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "docs",
-								},
-								RestURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "rest",
-								},
-								GrpcURL: &apis.URL{
-									Scheme: "https",
-									Host:   "kserve.com",
-									Path:   "grpc",
-								},
+							GrpcURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "grpc",
+							},
+						},
+						serverapiv1beta1.ExplainerComponent: {
+							URL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "docs",
+							},
+							RestURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "rest",
+							},
+							GrpcURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "grpc",
+							},
+						},
+						serverapiv1beta1.TransformerComponent: {
+							URL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "docs",
+							},
+							RestURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "rest",
+							},
+							GrpcURL: &apis.URL{
+								Scheme: "https",
+								Host:   "kserve.com",
+								Path:   "grpc",
 							},
 						},
 					},
 				},
 			},
-			outStr: []string{urlSet, description2, link21, link22, link23, link24, link25, link26, link27, link28, link29, link30, link31, link32, link33, nameTags2, compSpec2, resourceSpec2, apiSpec2},
+			mc: &golang.ModelCatalog{
+
+				Models: []golang.Model{
+					{
+						Name:        "default-InferSvc-2",
+						Description: types.DescriptionKey,
+						Lifecycle:   types.Lifecycle,
+						Owner:       types.Owner,
+						Ethics:      &ethicsKey,
+						HowToUseURL: &howToUseKey,
+						License:     &license,
+						Support:     &support,
+						Training:    &training,
+						Usage:       &usage,
+					},
+				},
+				ModelServer: &golang.ModelServer{
+					API: &golang.API{
+						Spec: types.APISpecKey,
+						Type: golang.Openapi,
+						URL:  "https://kserve.com",
+					},
+					Authentication: &falseVal,
+					Description:    types.DescriptionKey,
+					Lifecycle:      types.Lifecycle,
+					Owner:          types.Owner,
+					Name:           "default-InferSvc-2",
+					HomepageURL:    &homepage,
+					Usage:          &usage,
+				},
+			},
 		},
 	} {
 		cfg := &config.Config{}
@@ -279,265 +219,97 @@ func TestKserveBackstagePrinters(t *testing.T) {
 
 		isl, err := servingClient.InferenceServices(namespace).List(context.Background(), metav1.ListOptions{})
 		common.AssertError(t, err)
-		b := []byte{}
-		buf := bytes.NewBuffer(b)
-		bwriter := bufio.NewWriter(buf)
 		for _, is := range isl.Items {
-			err = CallBackstagePrinters(owner, lifecycle, &is, bwriter)
+			b := []byte{}
+			buf := bytes.NewBuffer(b)
+			bwriter := bufio.NewWriter(buf)
+			objs := []client.Object{}
+			objs = append(objs, &is)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+
+			err = CallBackstagePrinters(context.Background(), owner, lifecycle, &is, c, bwriter, types.JsonArrayForamt)
 			common.AssertError(t, err)
+			bwriter.Flush()
+			// so the order of the tags array is random so we can't just do json as a string compare, so we have to
+			// hydrate back to a &golang.ModelCatalog to compare fields
+			outMc := &golang.ModelCatalog{}
+			err = json.Unmarshal(buf.Bytes(), outMc)
+			common.AssertError(t, err)
+			common.AssertEqual(t, len(tc.mc.Models), len(outMc.Models))
+			common.AssertEqual(t, tc.mc.ModelServer != nil, outMc.ModelServer != nil)
+			for i, m := range tc.mc.Models {
+				om := outMc.Models[i]
+				common.AssertEqual(t, m.ArtifactLocationURL, om.ArtifactLocationURL)
+				common.AssertEqual(t, m.Description, om.Description)
+				common.AssertEqual(t, m.Ethics != nil, om.Ethics != nil)
+				if m.Ethics != nil {
+					common.AssertEqual(t, *m.Ethics, *om.Ethics)
+				}
+				common.AssertEqual(t, m.HowToUseURL != nil, om.HowToUseURL != nil)
+				if m.HowToUseURL != nil {
+					common.AssertEqual(t, *m.HowToUseURL, *om.HowToUseURL)
+				}
+				common.AssertEqual(t, m.License != nil, om.License != nil)
+				if m.License != nil {
+					common.AssertEqual(t, *m.License, *om.License)
+				}
+				common.AssertEqual(t, m.Lifecycle, om.Lifecycle)
+				common.AssertEqual(t, m.Name, om.Name)
+				common.AssertEqual(t, m.Owner, om.Owner)
+				common.AssertEqual(t, m.Support != nil, om.Support != nil)
+				if m.Support != nil {
+					common.AssertEqual(t, *m.Support, *om.Support)
+				}
+				common.AssertEqual(t, m.Training != nil, om.Training != nil)
+				if m.Training != nil {
+					common.AssertEqual(t, *m.Training, *om.Training)
+				}
+				common.AssertEqual(t, m.Usage != nil, om.Usage != nil)
+				if m.Usage != nil {
+					common.AssertEqual(t, *m.Usage, *om.Usage)
+				}
+			}
+			if tc.mc.ModelServer != nil {
+				common.AssertEqual(t, tc.mc.ModelServer.API != nil, outMc.ModelServer.API != nil)
+				if tc.mc.ModelServer.API != nil {
+					tm := tc.mc.ModelServer.API
+					om := outMc.ModelServer.API
+					common.AssertEqual(t, tm.Spec, om.Spec)
+					common.AssertEqual(t, tm.Type, om.Type)
+					common.AssertEqual(t, tm.URL, om.URL)
+				}
+				tm := tc.mc.ModelServer
+				om := outMc.ModelServer
+				common.AssertEqual(t, tm.Authentication != nil, om.Authentication != nil)
+				if tm.Authentication != nil {
+					common.AssertEqual(t, *tm.Authentication, *om.Authentication)
+				}
+				common.AssertEqual(t, tm.Description, om.Description)
+				common.AssertEqual(t, tm.HomepageURL != nil, om.HomepageURL != nil)
+				if tm.HomepageURL != nil {
+					common.AssertEqual(t, *tm.HomepageURL, *om.HomepageURL)
+				}
+				common.AssertEqual(t, tm.Lifecycle, om.Lifecycle)
+				common.AssertEqual(t, tm.Name, om.Name)
+				common.AssertEqual(t, tm.Usage != nil, om.Usage != nil)
+				if tm.Usage != nil {
+					common.AssertEqual(t, *tm.Usage, *om.Usage)
+				}
+			}
 		}
 
-		bwriter.Flush()
-		outstr := buf.String()
-		if len(tc.outStr) == 1 {
-			common.AssertLineCompare(t, outstr, tc.outStr[0], 0)
-			continue
-		}
-		common.AssertContains(t, outstr, tc.outStr)
 	}
 }
 
 var (
-	version = "v1.0"
-)
-
-const (
-	urlNotSet = `apiVersion: backstage.io/v1alpha1
-kind: Component
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: ./
-  description: KServe instance default:InferSvc-1
-  name: default_InferSvc-1
-spec:
-  dependsOn:
-  - resource:default_InferSvc-1
-  - api:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  providesApis:
-  - default_InferSvc-1
-  type: model-server
----
-apiVersion: backstage.io/v1alpha1
-kind: Resource
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: resource/
-  description: KServe instance default:InferSvc-1
-  name: default_InferSvc-1
-spec:
-  dependencyOf:
-  - component:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  providesApis:
-  - default_InferSvc-1
-  type: ai-model
----
-apiVersion: backstage.io/v1alpha1
-kind: API
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: api/
-  description: KServe instance default:InferSvc-1
-  name: default_InferSvc-1
-spec:
-  definition: ""
-  dependencyOf:
-  - component:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  type: unknown
-`
-	urlSet = `apiVersion: backstage.io/v1alpha1
-kind: Component
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: ./
-  description: KServe instance default:InferSvc-1
-  links:
-  - icon: WebAsset
-    title: API URL
-    type: website
-    url: https://kserve.com
-  name: default_InferSvc-1
-spec:
-  dependsOn:
-  - resource:default_InferSvc-1
-  - api:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  providesApis:
-  - default_InferSvc-1
-  type: model-server
----
-apiVersion: backstage.io/v1alpha1
-kind: Resource
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: resource/
-  description: KServe instance default:InferSvc-1
-  links:
-  - icon: WebAsset
-    title: API URL
-    type: website
-    url: https://kserve.com
-  name: default_InferSvc-1
-spec:
-  dependencyOf:
-  - component:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  providesApis:
-  - default_InferSvc-1
-  type: ai-model
----
-apiVersion: backstage.io/v1alpha1
-kind: API
-metadata:
-  annotations:
-    backstage.io/techdocs-ref: api/
-  description: KServe instance default:InferSvc-1
-  links:
-  - icon: WebAsset
-    title: API URL
-    type: website
-    url: https://kserve.com
-  name: default_InferSvc-1
-spec:
-  definition: ""
-  dependencyOf:
-  - component:default_InferSvc-1
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-1
-  type: unknown
-`
-
-	description2 = "description: KServe instance default:InferSvc-2"
-	link21       = `  - icon: WebAsset
-    title: API URL
-    type: website
-    url: https://kserve.com
-`
-	link22 = `  - icon: WebAsset
-    title: transformer FastAPI URL
-    type: website
-    url: https://kserve.com/docs/docs
-`
-	link23 = `  - icon: WebAsset
-    title: transformer model serving URL
-    type: website
-    url: https://kserve.com/docs
-`
-	link24 = `  - icon: WebAsset
-    title: transformer REST model serving URL
-    type: website
-    url: https://kserve.com/rest
-`
-	link25 = `  - icon: WebAsset
-    title: transformer GRPC model serving URL
-    type: website
-    url: https://kserve.com/grpc
-`
-	link26 = `  - icon: WebAsset
-    title: predictor FastAPI URL
-    type: website
-    url: https://kserve.com/docs/docs
-`
-	link27 = `  - icon: WebAsset
-    title: predictor model serving URL
-    type: website
-    url: https://kserve.com/docs
-`
-	link28 = `  - icon: WebAsset
-    title: predictor REST model serving URL
-    type: website
-    url: https://kserve.com/rest
-`
-	link29 = `  - icon: WebAsset
-    title: predictor GRPC model serving URL
-    type: website
-    url: https://kserve.com/grpc
-`
-	link30 = `  - icon: WebAsset
-    title: explainer FastAPI URL
-    type: website
-    url: https://kserve.com/docs/docs
-`
-	link31 = `  - icon: WebAsset
-    title: explainer model serving URL
-    type: website
-    url: https://kserve.com/docs
-`
-	link32 = `  - icon: WebAsset
-    title: explainer REST model serving URL
-    type: website
-    url: https://kserve.com/rest
-`
-	link33 = `  - icon: WebAsset
-    title: explainer GRPC model serving URL
-    type: website
-    url: https://kserve.com/grpc
-`
-	nameTags2 = `  name: default_InferSvc-2
-  tags:
-  - sklearn
-  - xgboost
-  - tensorflow
-  - pytorch
-  - triton
-  - onnx
-  - huggingface
-  - pmml
-  - lightgbm
-  - paddle
-  - f1-v1.0
-  - squareattack
-`
-	compSpec2 = `spec:
-  dependsOn:
-  - resource:default_InferSvc-2
-  - api:default_InferSvc-2
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-2
-  providesApis:
-  - default_InferSvc-2
-  type: model-server
-`
-	resourceSpec2 = `spec:
-  dependencyOf:
-  - component:default_InferSvc-2
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-2
-  providesApis:
-  - default_InferSvc-2
-  type: ai-model
-`
-	apiSpec2 = `spec:
-  definition: ""
-  dependencyOf:
-  - component:default_InferSvc-2
-  lifecycle: Lifecycle
-  owner: user:Owner
-  profile:
-    displayName: default_InferSvc-2
-  type: unknown
-`
+	version     = "v1.0"
+	falseVal    = false
+	trueVal     = true
+	ethicsKey   = types.EthicsKey
+	howToUseKey = types.HowToUseKey
+	license     = types.LicenseKey
+	support     = types.SupportKey
+	training    = types.TrainingKey
+	usage       = types.UsageKey
+	homepage    = types.HomepageURLKey
 )
