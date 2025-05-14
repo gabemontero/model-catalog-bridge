@@ -10,4 +10,9 @@ const (
 	GET_SERVING_ENV_URI              = "/serving_environments/%s"
 	GET_MODEL_ARTIFACT_URI           = "/model_artifacts/%s"
 	GET_MODEL_VERSION_URI            = "/model_versions/%s"
+	INF_SVC_MV_ID_LABEL              = "modelregistry.opendatahub.io/model-version-id"
+	INF_SVC_RM_ID_LABEL              = "modelregistry.opendatahub.io/registered-model-id"
+	INF_SVC_IngressReady_CONDITION   = "IngressReady"
+	INF_SVC_PredictorReady_CONDITION = "PredictorReady"
+	INF_SVC_Ready_CONDITION          = "Ready"
 )

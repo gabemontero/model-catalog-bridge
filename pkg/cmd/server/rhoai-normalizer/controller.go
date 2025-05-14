@@ -13,12 +13,14 @@ import (
 	"github.com/kubeflow/model-registry/pkg/openapi"
 	routev1 "github.com/openshift/api/route/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kserve"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kubeflowmodelregistry"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
 	bridgerest "github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	types2 "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	"io"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -301,19 +303,39 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	}
 	if len(importKey) == 0 {
 		// KServe only
-		//TODO we will deal with kserve-only and reconciling timing issues where a model is discovered via kserve-only
-		// mode first, but then later on we are able to correlate that running model with a KFMR entry
 
-		//TODO do we mandate a prop be set on the RM or MV for lifecycle?
-		//err = kserve.CallBackstagePrinters(is.Namespace, "developement", is, bwriter)
-		//
-		//if err != nil {
-		//	return reconcile.Result{}, nil
-		//}
-		//
-		//importKey, importURI = util.BuildImportKeyAndURI(is.Namespace, is.Name)
-		klog.Infof("inference service %s:%s does not correlate to a kubeflow model registry entry", is.Namespace, is.Name)
-		return reconcile.Result{}, nil
+		// let's wait for the status to reach a functional, ready state; aside from not exposing unusable models,
+		// this will avoid any initial timing issues with model registry wiring (DB storage or
+		// label setting), to be sure this is not a model registry created inference service
+		if len(is.Status.Conditions) == 0 {
+			return reconcile.Result{Requeue: true}, nil
+		}
+		if is.Status.ModelStatus.TransitionStatus != serverapiv1beta1.UpToDate {
+			return reconcile.Result{Requeue: true}, nil
+		}
+		for _, condition := range is.Status.Conditions {
+			switch {
+			case condition.Type == bridgerest.INF_SVC_IngressReady_CONDITION:
+				fallthrough
+			case condition.Type == bridgerest.INF_SVC_PredictorReady_CONDITION:
+				fallthrough
+			case condition.Type == bridgerest.INF_SVC_Ready_CONDITION:
+				if condition.Status != corev1.ConditionTrue {
+					return reconcile.Result{Requeue: true}, nil
+				}
+			}
+		}
+		if is.Status.URL == nil {
+			return reconcile.Result{Requeue: true}, nil
+		}
+
+		err = kserve.CallBackstagePrinters(ctx, is.Namespace, "developement", is, r.client, bwriter, r.format)
+
+		if err != nil {
+			return reconcile.Result{}, nil
+		}
+
+		importKey, _ = util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
 	}
 
 	err = r.processBWriter(bwriter, buf, importKey)
@@ -551,6 +573,33 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				controllerLog.Error(err, "error processing KFMR writer")
 				continue
 			}
+		}
+	}
+
+	isList := &serverapiv1beta1.InferenceServiceList{}
+	listOptions := &client.ListOptions{Namespace: metav1.NamespaceAll}
+	err = r.client.List(ctx, isList, listOptions)
+	if err != nil {
+		controllerLog.Error(err, "error listing kserve inferenceservices")
+	}
+	for _, is := range isList.Items {
+		skip := false
+		if is.Labels != nil {
+			for k := range is.Labels {
+				switch k {
+				case bridgerest.INF_SVC_MV_ID_LABEL:
+					fallthrough
+				case bridgerest.INF_SVC_RM_ID_LABEL:
+					controllerLog.V(4).Info(fmt.Sprintf("innerStart skipping inference service %s:%s since it is managed by kubeflow", is.Namespace, is.Name))
+					skip = true
+					break
+				}
+			}
+		}
+		if !skip {
+			// we'll let the reconcile loop build the entry; let's just add the key for the current key set call
+			importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
+			keys = append(keys, importKey)
 		}
 	}
 

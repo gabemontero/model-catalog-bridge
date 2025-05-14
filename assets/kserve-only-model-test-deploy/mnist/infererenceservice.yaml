@@ -1,0 +1,28 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    openshift.io/display-name: mnist - v1
+    security.opendatahub.io/enable-auth: "true"
+    serving.kserve.io/deploymentMode: RawDeployment
+  labels:
+    networking.kserve.io/visibility: exposed
+  name: mnist-v1
+spec:
+  predictor:
+    maxReplicas: 1
+    minReplicas: 1
+    model:
+      modelFormat:
+        name: onnx
+        version: "1"
+      name: ""
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      runtime: mnist-v1
+      storageUri: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx

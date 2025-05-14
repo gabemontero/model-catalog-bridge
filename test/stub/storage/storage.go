@@ -22,6 +22,7 @@ func SetupBridgeStorageRESTClient(ts *httptest.Server) *storage.BridgeStorageRES
 	storageTC.UpsertURL = ts.URL + util.UpsertURI
 	storageTC.ListURL = ts.URL + util.ListURI
 	storageTC.FetchURL = ts.URL + util.FetchURI
+	storageTC.CurrentKeySetURL = ts.URL + util.CurrentKeySetURI
 	return storageTC
 }
 
@@ -55,6 +56,18 @@ func CreateBridgeStorageREST(t *testing.T, called *sync.Map) *httptest.Server {
 			}
 		case common.MethodPost:
 			switch r.URL.Path {
+			case util.CurrentKeySetURI:
+				w.Header().Set("Content-Type", "application/json")
+				queryParams := r.URL.Query()
+				for k, v := range queryParams {
+					for _, vv := range v {
+						t.Logf("query param k %s vv %s", k, vv)
+						called.Store(k, vv)
+					}
+				}
+				_, _ = w.Write([]byte(" "))
+				w.WriteHeader(http.StatusOK)
+
 			default:
 				w.Header().Set("Content-Type", "application/json")
 				bodyBuf, err := io.ReadAll(r.Body)
