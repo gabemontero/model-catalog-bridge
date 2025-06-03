@@ -19,6 +19,7 @@ require (
 	k8s.io/client-go v0.31.4
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubectl v0.31.4
+	knative.dev/pkg v0.0.0-20241223131119-4c901591eb4a
 	sigs.k8s.io/controller-runtime v0.19.3
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -143,7 +144,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 // indirect
 	knative.dev/networking v0.0.0-20240815142417-37fdbdd0854b // indirect
-	knative.dev/pkg v0.0.0-20241223131119-4c901591eb4a // indirect
 	knative.dev/serving v0.42.2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect

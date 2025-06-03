@@ -246,13 +246,15 @@ func (f RHOAINormalizerFilter) Update(e event.UpdateEvent) bool {
 }
 
 type RHOAINormalizerReconcile struct {
-	client           client.Client
-	scheme           *runtime.Scheme
-	eventRecorder    record.EventRecorder
-	k8sToken         string
-	kfmrRoute        *routev1.Route
-	myNS             string
-	routeClient      *routeclient.RouteV1Client
+	client        client.Client
+	scheme        *runtime.Scheme
+	eventRecorder record.EventRecorder
+	k8sToken      string
+	//TODO make array to handle multi-registry
+	kfmrRoute   *routev1.Route
+	myNS        string
+	routeClient *routeclient.RouteV1Client
+	//TODO make array to handle multi-registry
 	kfmr             *kubeflowmodelregistry.KubeFlowRESTClientWrapper
 	storage          *storage.BridgeStorageRESTClient
 	format           types2.NormalizerFormat
@@ -380,6 +382,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 	}
 
 	var kfmrISs []openapi.InferenceService
+	//TODO as part of multi-registry support, need to iterator over all the model registries we are aware of to see which one deployed the KServe InferenceService, adding to the kfmrISs array
 	kfmrISs, err = r.kfmr.ListInferenceServices()
 	if err != nil {
 		log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error listing kfmr registered models", name.String()))
@@ -531,7 +534,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 	var mas map[string]map[string][]openapi.ModelArtifact
 	var isl []openapi.InferenceService
 
-	//TODO what do we do with owner/lifecycle when we poll
+	//TODO when we officially do multi model registry, the `r.kfmr` field will be an array, and we'll aggregate each model registry's output into what we process below.
 	rms, mvs, mas, err = kubeflowmodelregistry.LoopOverKFMR([]string{}, r.kfmr)
 	if err != nil {
 		controllerLog.Error(err, "err looping over KFMR")
