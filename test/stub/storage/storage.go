@@ -66,7 +66,6 @@ func CreateBridgeStorageREST(t *testing.T, called *sync.Map) *httptest.Server {
 					}
 				}
 				_, _ = w.Write([]byte(" "))
-				w.WriteHeader(http.StatusOK)
 
 			default:
 				w.Header().Set("Content-Type", "application/json")
@@ -91,7 +90,6 @@ func CreateBridgeStorageREST(t *testing.T, called *sync.Map) *httptest.Server {
 				t.Logf("got buf of len %d", len(data.Body))
 				called.Store(r.URL.Path, string(data.Body))
 				_, _ = w.Write([]byte(fmt.Sprintf(common.TestPostJSONStringOneLinePlusBody, string(data.Body))))
-				w.WriteHeader(201)
 
 			}
 		}
