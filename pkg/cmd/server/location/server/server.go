@@ -20,9 +20,10 @@ type ImportLocationServer struct {
 	content map[string]*ImportLocation
 	storage *storage.BridgeStorageRESTClient
 	format  types.NormalizerFormat
+	port    string
 }
 
-func NewImportLocationServer(stURL string, nf types.NormalizerFormat) *ImportLocationServer {
+func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *ImportLocationServer {
 	//var content map[string]*ImportLocation
 	gin.SetMode(gin.ReleaseMode)
 	cfg, _ := util.GetK8sConfig(&config.Config{})
@@ -32,6 +33,7 @@ func NewImportLocationServer(stURL string, nf types.NormalizerFormat) *ImportLoc
 		content: map[string]*ImportLocation{},
 		storage: storage.SetupBridgeStorageRESTClient(stURL, util.GetCurrentToken(cfg)),
 		format:  nf,
+		port:    port,
 	}
 	r.SetTrustedProxies(nil)
 	r.TrustedPlatform = "X-Forwarded-For"
@@ -106,7 +108,7 @@ func (i *ImportLocationServer) Run(stopCh <-chan struct{}) {
 			case <-ch:
 				return
 			default:
-				err := i.router.Run(":9090")
+				err := i.router.Run(fmt.Sprintf(":%s", i.port))
 				if err != nil {
 					klog.Errorf("ERROR: gin-gonic run error %s", err.Error())
 				}

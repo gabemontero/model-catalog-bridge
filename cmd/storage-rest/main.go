@@ -12,8 +12,12 @@ import (
 )
 
 func main() {
+	var address string
+	goflag.StringVar(&address, "address", "7070", "The port the storage service listens on.")
 	flagset := goflag.NewFlagSet("storage-rest", goflag.ContinueOnError)
+	flagset.Parse(goflag.CommandLine.Args())
 	klog.InitFlags(flagset)
+	goflag.Parse()
 
 	st := os.Getenv(types.StorageTypeEnvVar)
 	storageType := types.BridgeStorageType(st)
@@ -50,7 +54,7 @@ func main() {
 	nfstr := os.Getenv(types.FormatEnvVar)
 	nf := types.NormalizerFormat(nfstr)
 
-	server := storage.NewStorageRESTServer(bs, bridgeURL, bridgeToken, bkstgToken, nf)
+	server := storage.NewStorageRESTServer(bs, address, bridgeURL, bridgeToken, bkstgToken, nf)
 	stopCh := util.SetupSignalHandler()
 	server.Run(stopCh)
 

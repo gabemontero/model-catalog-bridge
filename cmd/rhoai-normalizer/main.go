@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metrics "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var (
@@ -22,7 +23,9 @@ var (
 
 func main() {
 	var pprofAddr string
+	var metricsAddr string
 	flag.StringVar(&pprofAddr, "pprof-address", "6000", "The address the pprof endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-address", metrics.DefaultBindAddress, "The address the metrics server endpoint binds to.")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -48,6 +51,7 @@ func main() {
 	restConfig.Burst = 50
 	var mgr ctrl.Manager
 	mopts := ctrl.Options{}
+	mopts.Metrics.BindAddress = metricsAddr
 
 	mgr, err = rhoai_normalizer.NewControllerManager(ctx, restConfig, mopts, pprofAddr)
 	if err != nil {

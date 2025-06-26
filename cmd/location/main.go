@@ -12,8 +12,12 @@ import (
 )
 
 func main() {
+	var address string
+	goflag.StringVar(&address, "address", "9090", "The port the location service listens on.")
 	flagset := goflag.NewFlagSet("location", goflag.ContinueOnError)
+	flagset.Parse(goflag.CommandLine.Args())
 	klog.InitFlags(flagset)
+	goflag.Parse()
 
 	st := os.Getenv(types.StorageUrlEnvVar)
 	rr := strings.NewReplacer("\r", "", "\n", "")
@@ -30,7 +34,7 @@ func main() {
 	if len(nfstr) == 0 {
 		nf = types.JsonArrayForamt
 	}
-	server := gin_gonic_http_srv.NewImportLocationServer(st, nf)
+	server := gin_gonic_http_srv.NewImportLocationServer(st, address, nf)
 	stopCh := util.SetupSignalHandler()
 	server.Run(stopCh)
 
