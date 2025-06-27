@@ -33,9 +33,10 @@ type StorageRESTServer struct {
 	bkstgToken      string
 	format          types.NormalizerFormat
 	pushToRHDH      bool
+	port            string
 }
 
-func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
+func NewStorageRESTServer(st types.BridgeStorage, port, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	pushToRHDH := true
@@ -53,6 +54,7 @@ func NewStorageRESTServer(st types.BridgeStorage, bridgeURL, bridgeToken, bkstgT
 		bkstgToken:      bkstgToken,
 		format:          nf,
 		pushToRHDH:      pushToRHDH,
+		port:            port,
 	}
 	s.setupBkstg()
 	klog.Infof("NewStorageRESTServer")
@@ -84,7 +86,7 @@ func (s *StorageRESTServer) Run(stopCh <-chan struct{}) {
 			case <-ch:
 				return
 			default:
-				err := s.router.Run(":7070")
+				err := s.router.Run(fmt.Sprintf(":%s", s.port))
 				if err != nil {
 					klog.Errorf("ERROR: gin-gonic run error %s", err.Error())
 				}
