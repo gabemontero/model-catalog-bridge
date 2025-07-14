@@ -163,11 +163,11 @@ func TestHandleCatalogUpsertPost(t *testing.T) {
 			common.AssertEqual(t, true, found)
 		}
 
-		common.AssertEqual(t, len(ils.content), len(tc.expectedContent))
+		common.AssertEqual(t, len(tc.expectedContent), len(ils.content))
 		for key, val := range tc.expectedContent {
 			v, ok := ils.content[key]
-			common.AssertEqual(t, ok, true)
-			common.AssertEqual(t, v, val)
+			common.AssertEqual(t, true, ok)
+			common.AssertEqual(t, val, v)
 		}
 	}
 }

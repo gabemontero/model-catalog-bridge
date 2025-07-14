@@ -13,6 +13,7 @@ import (
 	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 type ImportLocationServer struct {
@@ -21,6 +22,7 @@ type ImportLocationServer struct {
 	storage *storage.BridgeStorageRESTClient
 	format  types.NormalizerFormat
 	port    string
+	lock    sync.Mutex
 }
 
 func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *ImportLocationServer {
@@ -34,6 +36,7 @@ func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *Imp
 		storage: storage.SetupBridgeStorageRESTClient(stURL, util.GetCurrentToken(cfg)),
 		format:  nf,
 		port:    port,
+		lock:    sync.Mutex{},
 	}
 	r.SetTrustedProxies(nil)
 	r.TrustedPlatform = "X-Forwarded-For"
@@ -52,6 +55,23 @@ func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *Imp
 	r.GET(util.ListURI, i.handleCatalogDiscoveryGet)
 	r.POST(util.UpsertURI, i.handleCatalogUpsertPost)
 	r.DELETE(util.RemoveURI, i.handleCatalogDelete)
+	r.GET("/:model/:version/:format", func(c *gin.Context) {
+		var model ModelURI
+		if err := c.ShouldBindUri(&model); err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		_, uriString := util.BuildImportKeyAndURI(model.Model, model.Version, i.format)
+		i.lock.Lock()
+		defer i.lock.Unlock()
+		il, ok := i.content[uriString]
+		if !ok {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		klog.Infof("returning content: uriString %s with data of len %d", uriString, len(il.content))
+		il.handleCatalogInfoGet(c)
+	})
 	return i
 }
 
@@ -93,6 +113,8 @@ func (i *ImportLocationServer) loadFromStorage() (bool, error) {
 			return false, nil
 		}
 		_, uri := util.BuildImportKeyAndURI(segs[0], segs[1], i.format)
+		i.lock.Lock()
+		defer i.lock.Unlock()
 		i.content[uri] = il
 		i.router.GET(uri, il.handleCatalogInfoGet)
 	}
@@ -137,6 +159,8 @@ type DicoveryResponse struct {
 
 func (i *ImportLocationServer) handleCatalogDiscoveryGet(c *gin.Context) {
 	d := &DicoveryResponse{}
+	i.lock.Lock()
+	defer i.lock.Unlock()
 	for uri, il := range i.content {
 		//TODO normalizer id should be part of the model lookup URI a la "kubeflow/mnist/v1" or "kserve/mnist/v1"
 
@@ -153,6 +177,12 @@ func (i *ImportLocationServer) handleCatalogDiscoveryGet(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "Content-Type: application/json", content)
+}
+
+type ModelURI struct {
+	Model   string `uri:"model" binding:"required"`
+	Version string `uri:"version" binding:"required"`
+	Format  string `uri:"format" binding:"required"`
 }
 
 func (u *ImportLocationServer) handleCatalogUpsertPost(c *gin.Context) {
@@ -178,15 +208,13 @@ func (u *ImportLocationServer) handleCatalogUpsertPost(c *gin.Context) {
 		return
 	}
 	//TODO normalizer id should be part of the model lookup URI
-	_, uri := util.BuildImportKeyAndURI(segs[0], segs[1], u.format)
-	klog.Infof("Upserting URI %s with data of len %d", uri, len(postBody.Body))
-	il, exists := u.content[uri]
-	if !exists {
-		il = &ImportLocation{}
-		u.router.GET(uri, il.handleCatalogInfoGet)
-	}
+	_, uriString := util.BuildImportKeyAndURI(segs[0], segs[1], u.format)
+	il := &ImportLocation{}
 	il.content = postBody.Body
-	u.content[uri] = il
+	u.lock.Lock()
+	defer u.lock.Unlock()
+	u.content[uriString] = il
+	klog.Infof("Upserting URI %s with data of len %d", uriString, len(postBody.Body))
 	c.Status(http.StatusCreated)
 }
 
@@ -206,8 +234,10 @@ func (u *ImportLocationServer) handleCatalogDelete(c *gin.Context) {
 	//TODO normalizer id should be part of the model lookup URI
 	_, uri := util.BuildImportKeyAndURI(segs[0], segs[1], u.format)
 	klog.Infof("Removing URI %s", uri)
-	// there is no way to unregister a URI, so we remove its content regardless of removing it from the map so that
+	// you don't unbind URIs, so we remove its content regardless of removing it from the map so that
 	// when backstage calls, we can return it a not found if the content is now nil
+	u.lock.Lock()
+	defer u.lock.Unlock()
 	il, ok := u.content[uri]
 	if ok {
 		il.content = nil
