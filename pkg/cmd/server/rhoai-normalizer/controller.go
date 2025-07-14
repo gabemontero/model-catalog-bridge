@@ -345,7 +345,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{Requeue: true}, nil
 		}
 
-		err = kserve.CallBackstagePrinters(ctx, is.Namespace, "developement", is, r.client, bwriter, r.format)
+		err = kserve.CallBackstagePrinters(ctx, is.Namespace, r.defaultLifecycle, is, r.client, bwriter, r.format)
 
 		if err != nil {
 			return reconcile.Result{}, nil
@@ -570,7 +570,8 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				eb := []byte{}
 				ebuf := bytes.NewBuffer(eb)
 				ewriter := bufio.NewWriter(ebuf)
-				if buf != nil && bwriter != nil {
+				// if the old catalog info format, let's accumulate in 1 block of yaml
+				if r.format == types2.CatalogInfoYamlFormat && buf != nil && bwriter != nil {
 					ebuf = buf
 					ewriter = bwriter
 				}
@@ -579,7 +580,15 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					controllerLog.Error(err, "error listing kubeflow inference services")
 					continue
 				}
-				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, mva, maa, isl, nil, kfmr, r.client, ewriter, r.format)
+				// only include inference services that correspond to this model version
+				mvISL := []openapi.InferenceService{}
+				for _, is := range isl {
+					if is.GetModelVersionId() == mv.GetId() && is.ModelVersionId != nil {
+						mvISL = append(mvISL, is)
+					}
+				}
+				// only include this model version vs. whole array to line up with our importKey
+				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, []openapi.ModelVersion{mv}, maa, mvISL, nil, kfmr, r.client, ewriter, r.format)
 				if err != nil {
 					controllerLog.Error(err, "error processing calling backstage printer")
 					continue
