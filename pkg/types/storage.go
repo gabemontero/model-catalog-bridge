@@ -15,6 +15,7 @@ type StorageBody struct {
 	LocationId      string `json:"locationId"`
 	LocationTarget  string `json:"locationTarget"`
 	LocationIDValid bool   `json:"locationIDValid"`
+	ReconcilerType  string `json:"reconcilerType"`
 }
 
 type BridgeStorageType string

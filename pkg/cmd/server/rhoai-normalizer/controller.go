@@ -317,8 +317,10 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{}, err
 		}
 	}
+	normilzerType := types2.KubeflowNormalizer
 	if len(importKey) == 0 {
 		// KServe only
+		normilzerType = types2.KServeNormalizer
 
 		// let's wait for the status to reach a functional, ready state; aside from not exposing unusable models,
 		// this will avoid any initial timing issues with model registry wiring (DB storage or
@@ -354,7 +356,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 		importKey, _ = util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
 	}
 
-	err = r.processBWriter(bwriter, buf, importKey)
+	err = r.processBWriter(bwriter, buf, importKey, normilzerType)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -362,7 +364,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey string) error {
+func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType string) error {
 	err := bwriter.Flush()
 	if err != nil {
 		return err
@@ -370,7 +372,7 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 
 	httpRC := 0
 	msg := ""
-	httpRC, msg, _, err = r.storage.UpsertModel(importKey, buf.Bytes())
+	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -593,7 +595,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					controllerLog.Error(err, "error processing calling backstage printer")
 					continue
 				}
-				err = r.processBWriter(ewriter, ebuf, importKey)
+				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer)
 				if err != nil {
 					controllerLog.Error(err, "error processing KFMR writer")
 					continue

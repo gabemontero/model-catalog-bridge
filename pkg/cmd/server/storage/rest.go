@@ -31,13 +31,13 @@ func SetupBridgeStorageRESTClient(hostURL, token string) *BridgeStorageRESTClien
 	return b
 }
 
-func (b *BridgeStorageRESTClient) UpsertModel(importKey string, buf []byte) (int, string, *rest.PostBody, error) {
+func (b *BridgeStorageRESTClient) UpsertModel(importKey, normalizerType string, buf []byte) (int, string, *rest.PostBody, error) {
 	var err error
 	var storageResp *resty.Response
 	body := rest.PostBody{
 		Body: buf,
 	}
-	storageResp, err = b.RESTClient.R().SetBody(body).SetAuthToken(b.Token).SetQueryParam(util.KeyQueryParam, importKey).SetHeader("Accept", "application/json").Post(b.UpsertURL)
+	storageResp, err = b.RESTClient.R().SetBody(body).SetAuthToken(b.Token).SetQueryParam(util.KeyQueryParam, importKey).SetQueryParam(util.TypeQueryParam, normalizerType).SetHeader("Accept", "application/json").Post(b.UpsertURL)
 	msg := fmt.Sprintf("%#v", storageResp)
 	if err != nil {
 		return http.StatusInternalServerError, msg, &body, err
