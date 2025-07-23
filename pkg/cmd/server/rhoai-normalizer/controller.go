@@ -120,13 +120,27 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 		}
 		parts := strings.Split(routeTuple, ":")
 		kfmrRoute := &routev1.Route{}
-		ns := "istio-system"
+		ns := metav1.NamespaceAll
 		name := parts[0]
 		if len(parts) > 1 {
 			ns = parts[0]
 			name = parts[1]
 		}
-		kfmrRoute, err = r.routeClient.Routes(ns).Get(ctx, name, metav1.GetOptions{})
+		switch ns {
+		case metav1.NamespaceAll:
+			routes, _ := r.routeClient.Routes(ns).List(ctx, metav1.ListOptions{})
+			if routes == nil || len(routes.Items) == 0 {
+				continue
+			}
+			for _, route := range routes.Items {
+				if route.Name == name {
+					kfmrRoute = &route
+					break
+				}
+			}
+		default:
+			kfmrRoute, err = r.routeClient.Routes(ns).Get(ctx, name, metav1.GetOptions{})
+		}
 		if err != nil {
 			controllerLog.Error(err, "error fetching model registry route")
 			continue
