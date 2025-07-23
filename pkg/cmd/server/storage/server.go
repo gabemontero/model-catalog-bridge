@@ -339,7 +339,9 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 			c.Status(http.StatusInternalServerError)
 			msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
 			klog.Errorf(msg)
-			c.Error(fmt.Errorf(msg))
+			// let's not error out if backstage is not available for a push / import location ... backstage will pull
+			// when it comes up
+			c.Status(http.StatusCreated)
 			return
 		}
 		retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
