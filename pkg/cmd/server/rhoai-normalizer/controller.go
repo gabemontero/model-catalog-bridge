@@ -612,7 +612,8 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 	}
 	for _, is := range isList.Items {
 		skip := false
-		if is.Labels != nil {
+		// don't skip if infererncesvc come from kubeflow, but somehow we don't have a route to kubeflow
+		if is.Labels != nil && len(r.kfmr) > 0 {
 			for k := range is.Labels {
 				switch k {
 				case bridgerest.INF_SVC_MV_ID_LABEL:
