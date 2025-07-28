@@ -138,7 +138,7 @@ func (s *StorageRESTServer) del(key string) {
 //     aggressive delete) but for a TBD reason deleting the location does not appear to be working form our EntityProvider
 //   - we then remove the entry from the location service
 func (s *StorageRESTServer) handleCatalogCurrentKeySetPost(c *gin.Context) {
-	key := c.Query("key")
+	key := c.Query(util.KeyQueryParam)
 	// no content for the key QP means no models were discovered
 
 	keys := strings.Split(key, ",")
@@ -234,12 +234,13 @@ func (s *StorageRESTServer) handleCatalogCurrentKeySetPost(c *gin.Context) {
 //   - updates the location service with the corresponding URI and content
 //   - if importing to backstage was not previously done, it does that, and then stores the ID returned form backstage in storage
 func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
-	key := c.Query("key")
+	key := c.Query(util.KeyQueryParam)
 	if len(key) == 0 {
 		c.Status(http.StatusBadRequest)
 		c.Error(fmt.Errorf("need a 'key' parameter"))
 		return
 	}
+	reconcilerType := c.Query(util.TypeQueryParam)
 	var postBody rest.PostBody
 	err := c.BindJSON(&postBody)
 	if err != nil {
@@ -270,6 +271,7 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 
 	alreadyPushed := len(sb.LocationId) > 0
 	sb.Body = postBody.Body
+	sb.ReconcilerType = reconcilerType
 	err = s.st.Upsert(key, *sb)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -337,7 +339,9 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 			c.Status(http.StatusInternalServerError)
 			msg = fmt.Sprintf("error importing location %s to backstage: %s", s.locations.HostURL+uri, err.Error())
 			klog.Errorf(msg)
-			c.Error(fmt.Errorf(msg))
+			// let's not error out if backstage is not available for a push / import location ... backstage will pull
+			// when it comes up
+			c.Status(http.StatusCreated)
 			return
 		}
 		retID, retTarget, rok := rest.ParseImportLocationMap(impResp)
@@ -395,7 +399,7 @@ func (s *StorageRESTServer) handleCatalogList(c *gin.Context) {
 }
 
 func (s *StorageRESTServer) handleCatalogFetch(c *gin.Context) {
-	key := c.Query("key")
+	key := c.Query(util.KeyQueryParam)
 	if len(key) == 0 {
 		c.Status(http.StatusBadRequest)
 		c.Error(fmt.Errorf("need a 'key' parameter"))

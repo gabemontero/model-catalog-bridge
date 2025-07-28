@@ -155,7 +155,13 @@ func TestReconcile(t *testing.T) {
 			is: &serverapiv1beta1.InferenceService{
 				ObjectMeta: metav1.ObjectMeta{Name: "mnist-v1", Namespace: "ggmtest"},
 				Spec:       serverapiv1beta1.InferenceServiceSpec{},
-				Status:     serverapiv1beta1.InferenceServiceStatus{},
+				Status: serverapiv1beta1.InferenceServiceStatus{
+					URL: &apis.URL{
+						Scheme: "http",
+						Host:   "foo.com",
+						Path:   "/mymodel",
+					},
+				},
 			},
 			kfmrSvr:       kts1,
 			expectedFound: true,
@@ -179,11 +185,17 @@ func TestReconcile(t *testing.T) {
 		common.AssertError(t, err)
 		found := false
 		callback.Range(func(key, value any) bool {
-			found = true
+			if len(tc.expectedValue) == 0 {
+				found = true
+			}
 			t.Logf(fmt.Sprintf("found key %s for test %s", key, tc.name))
 			postStr, ok := value.(string)
 			common.AssertEqual(t, ok, true)
-			common.AssertContains(t, postStr, []string{tc.expectedValue})
+			// note our expected value could be in any of the k/v pairs; we just need to find in one of them
+			missing := common.Contains(t, postStr, []string{tc.expectedValue})
+			if len(missing) == 0 {
+				found = true
+			}
 
 			return true
 		})
@@ -361,6 +373,100 @@ func TestStart(t *testing.T) {
 		})
 	}
 
+}
+
+func TestStart_JsonArray_MultiVersion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = serverapiv1beta1.AddToScheme(scheme)
+	kts1 := kfmr.CreateGetServerWithInference(t)
+	defer kts1.Close()
+	brts := location.CreateBridgeLocationServer(t)
+	defer brts.Close()
+	callback := sync.Map{}
+	bsts := storage.CreateBridgeStorageREST(t, &callback)
+	defer bsts.Close()
+
+	r := &RHOAINormalizerReconcile{
+		scheme:        scheme,
+		eventRecorder: nil,
+		k8sToken:      "",
+		myNS:          "",
+		routeClient:   nil,
+		kfmrRoute: map[string]*routev1.Route{
+			"foo": &routev1.Route{
+				Spec: routev1.RouteSpec{
+					Host: "http://foo.com",
+				},
+				Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
+			},
+		},
+		storage: storage.SetupBridgeStorageRESTClient(bsts),
+		// using JSON array to make sure we don't leak different model version in the same import key
+		format: types2.JsonArrayForamt,
+	}
+	for _, tc := range []struct {
+		name          string
+		is            *serverapiv1beta1.InferenceService
+		kfmrSvr       []*httptest.Server
+		expectedKey   string
+		expectedValue []string
+	}{
+		{
+			name: "deployed with multiple registries, with inference_service and serving_environments added, but also not deployed, only registered model, model version, model artifact",
+			is: &serverapiv1beta1.InferenceService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mnist-v1",
+					Namespace: "ggmtest",
+					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1"},
+				},
+				Spec: serverapiv1beta1.InferenceServiceSpec{},
+				Status: serverapiv1beta1.InferenceServiceStatus{
+					URL: &apis.URL{
+						Scheme: "http",
+						Host:   "foo.com",
+						Path:   "/mymodel",
+					},
+				},
+			},
+			kfmrSvr:       []*httptest.Server{kts1},
+			expectedKey:   "mnist_v1,mnist_v3",
+			expectedValue: []string{"url: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx", "description: dummy model 1"},
+		},
+	} {
+		ctx := context.TODO()
+		objs := []client.Object{tc.is}
+		r.kfmrRoute = map[string]*routev1.Route{}
+		r.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
+		for i, kfmrSvr := range tc.kfmrSvr {
+			cfg := &config.Config{}
+			kfmr.SetupKubeflowTestRESTClient(kfmrSvr, cfg)
+			r.kfmr[fmt.Sprintf("%s-%d", tc.name, i)] = kubeflowmodelregistry.SetupKubeflowRESTClient(cfg)
+		}
+		r.client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+
+		b := []byte{}
+		buf := bytes.NewBuffer(b)
+		bwriter := bufio.NewWriter(buf)
+		r.innerStart(ctx, buf, bwriter)
+
+		data1, ok1 := callback.Load("key=mnist_v1&type=kubeflow")
+		common.AssertEqual(t, true, ok1)
+		common.AssertEqual(t, false, strings.Contains(fmt.Sprintf("%v", data1), "mnist-v3"))
+		common.AssertEqual(t, true, strings.Contains(fmt.Sprintf("%v", data1), "mnist-v1"))
+		common.AssertEqual(t, true, strings.Contains(fmt.Sprintf("%v", data1), "modelServer"))
+		data2, ok2 := callback.Load("key=mnist_v3&type=kubeflow")
+		common.AssertEqual(t, true, ok2)
+		common.AssertEqual(t, false, strings.Contains(fmt.Sprintf("%v", data2), "mnist-v1"))
+		common.AssertEqual(t, false, strings.Contains(fmt.Sprintf("%v", data2), "modelServer"))
+		common.AssertEqual(t, true, strings.Contains(fmt.Sprintf("%v", data2), "mnist-v3"))
+
+		// clear out callback for next test
+		callback.Range(func(key, value any) bool {
+			callback.Delete(key)
+			return true
+		})
+
+	}
 }
 
 func TestStartArchived(t *testing.T) {

@@ -120,13 +120,27 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 		}
 		parts := strings.Split(routeTuple, ":")
 		kfmrRoute := &routev1.Route{}
-		ns := "istio-system"
+		ns := metav1.NamespaceAll
 		name := parts[0]
 		if len(parts) > 1 {
 			ns = parts[0]
 			name = parts[1]
 		}
-		kfmrRoute, err = r.routeClient.Routes(ns).Get(ctx, name, metav1.GetOptions{})
+		switch ns {
+		case metav1.NamespaceAll:
+			routes, _ := r.routeClient.Routes(ns).List(ctx, metav1.ListOptions{})
+			if routes == nil || len(routes.Items) == 0 {
+				continue
+			}
+			for _, route := range routes.Items {
+				if route.Name == name {
+					kfmrRoute = &route
+					break
+				}
+			}
+		default:
+			kfmrRoute, err = r.routeClient.Routes(ns).Get(ctx, name, metav1.GetOptions{})
+		}
 		if err != nil {
 			controllerLog.Error(err, "error fetching model registry route")
 			continue
@@ -317,8 +331,10 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{}, err
 		}
 	}
+	normilzerType := types2.KubeflowNormalizer
 	if len(importKey) == 0 {
 		// KServe only
+		normilzerType = types2.KServeNormalizer
 
 		// let's wait for the status to reach a functional, ready state; aside from not exposing unusable models,
 		// this will avoid any initial timing issues with model registry wiring (DB storage or
@@ -345,7 +361,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{Requeue: true}, nil
 		}
 
-		err = kserve.CallBackstagePrinters(ctx, is.Namespace, "developement", is, r.client, bwriter, r.format)
+		err = kserve.CallBackstagePrinters(ctx, is.Namespace, r.defaultLifecycle, is, r.client, bwriter, r.format)
 
 		if err != nil {
 			return reconcile.Result{}, nil
@@ -354,7 +370,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 		importKey, _ = util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
 	}
 
-	err = r.processBWriter(bwriter, buf, importKey)
+	err = r.processBWriter(bwriter, buf, importKey, normilzerType)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -362,7 +378,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey string) error {
+func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType string) error {
 	err := bwriter.Flush()
 	if err != nil {
 		return err
@@ -370,7 +386,7 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 
 	httpRC := 0
 	msg := ""
-	httpRC, msg, _, err = r.storage.UpsertModel(importKey, buf.Bytes())
+	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -570,7 +586,8 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				eb := []byte{}
 				ebuf := bytes.NewBuffer(eb)
 				ewriter := bufio.NewWriter(ebuf)
-				if buf != nil && bwriter != nil {
+				// if the old catalog info format, let's accumulate in 1 block of yaml
+				if r.format == types2.CatalogInfoYamlFormat && buf != nil && bwriter != nil {
 					ebuf = buf
 					ewriter = bwriter
 				}
@@ -579,12 +596,20 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					controllerLog.Error(err, "error listing kubeflow inference services")
 					continue
 				}
-				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, mva, maa, isl, nil, kfmr, r.client, ewriter, r.format)
+				// only include inference services that correspond to this model version
+				mvISL := []openapi.InferenceService{}
+				for _, is := range isl {
+					if is.GetModelVersionId() == mv.GetId() && is.ModelVersionId != nil {
+						mvISL = append(mvISL, is)
+					}
+				}
+				// only include this model version vs. whole array to line up with our importKey
+				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, []openapi.ModelVersion{mv}, maa, mvISL, nil, kfmr, r.client, ewriter, r.format)
 				if err != nil {
 					controllerLog.Error(err, "error processing calling backstage printer")
 					continue
 				}
-				err = r.processBWriter(ewriter, ebuf, importKey)
+				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer)
 				if err != nil {
 					controllerLog.Error(err, "error processing KFMR writer")
 					continue
@@ -601,7 +626,8 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 	}
 	for _, is := range isList.Items {
 		skip := false
-		if is.Labels != nil {
+		// don't skip if infererncesvc come from kubeflow, but somehow we don't have a route to kubeflow
+		if is.Labels != nil && len(r.kfmr) > 0 {
 			for k := range is.Labels {
 				switch k {
 				case bridgerest.INF_SVC_MV_ID_LABEL:

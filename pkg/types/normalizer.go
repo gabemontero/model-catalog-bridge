@@ -6,6 +6,9 @@ const (
 	CatalogInfoYamlFormat NormalizerFormat = "CatalogInfoYamlFormat"
 	JsonArrayForamt       NormalizerFormat = "JsonArrayFormat"
 
+	KServeNormalizer = "kserve" // for kserve only
+	KubeflowNormalizer = "kubeflow" // for kubeflow only or kubeflow+kserve, where we currently don't see a need to distinguish between those two
+
 	LocationUrlEnvVar        = "BRIDGE_URL"
 	ModelRegistryRouteEnvVar = "MR_ROUTE"
 	BackstageUrlEnvVar       = "BKSTG_URL"
