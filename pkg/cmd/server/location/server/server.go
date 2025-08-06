@@ -72,6 +72,9 @@ func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *Imp
 		klog.Infof("returning content: uriString %s with data of len %d", uriString, len(il.content))
 		il.handleCatalogInfoGet(c)
 	})
+	r.GET(util.ModelCardURI, func(c *gin.Context) {
+		c.Data(http.StatusOK, "Content-Type: text/markdown", []byte(util.ModelCardTestContent))
+	})
 	return i
 }
 
