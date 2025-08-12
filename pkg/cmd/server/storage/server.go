@@ -40,7 +40,7 @@ type StorageRESTServer struct {
 func NewStorageRESTServer(st types.BridgeStorage, port, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	pushToRHDH := true
+	pushToRHDH := false
 	pushStr := os.Getenv(types.PushToRHDHEnvVar)
 	push, err := strconv.ParseBool(pushStr)
 	if err == nil && len(pushStr) > 0 {
@@ -260,9 +260,10 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 	}
 	uri := ""
 	key, uri = util.BuildImportKeyAndURI(segs[0], segs[1], s.format)
-	klog.Infof("Upserting URI %s with key %s with data of len %d", uri, key, len(postBody.Body))
+	klog.Infof("Upserting URI %s with key %s with data of len %d and last epoch %s", uri, key, len(postBody.Body), postBody.LastUpdateTimeSinceEpoch)
 
 	sb := &types.StorageBody{}
+    sb.LastUpdateTimeSinceEpoch = postBody.LastUpdateTimeSinceEpoch
 	sb, err = s.sync(key)
 	if err != nil {
 		klog.Error(err.Error())
