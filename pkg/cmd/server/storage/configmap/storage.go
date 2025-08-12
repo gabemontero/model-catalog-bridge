@@ -3,6 +3,7 @@ package configmap
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
 	corev1 "k8s.io/api/core/v1"

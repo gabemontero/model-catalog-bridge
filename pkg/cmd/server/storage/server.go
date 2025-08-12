@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
@@ -15,12 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8srest "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"net/http"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 type StorageRESTServer struct {
