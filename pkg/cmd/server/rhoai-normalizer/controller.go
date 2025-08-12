@@ -6,6 +6,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/go-resty/resty/v2"
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
@@ -19,7 +25,6 @@ import (
 	bridgerest "github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	types2 "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,16 +36,12 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"net/http"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
-	"time"
 )
 
 var (
@@ -109,6 +110,9 @@ func (p *pprof) Start(ctx context.Context) error {
 }
 
 func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
+	if len(r.kfmr) > 0 {
+		return true
+	}
 	var err error
 	rr := strings.NewReplacer("\r", "", "\n", "")
 	mrRoute := os.Getenv(types2.ModelRegistryRouteEnvVar)
@@ -151,7 +155,16 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 	}
 
 	if len(r.kfmrRoute) == 0 {
-		return false
+		// try label based query
+		routes, _ := r.routeClient.Routes(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+			LabelSelector: "app.kubernetes.io/managed-by=model-registry-operator",
+		})
+		if routes == nil || len(routes.Items) == 0 {
+			return false
+		}
+		for _, route := range routes.Items {
+			r.kfmrRoute[fmt.Sprintf("%s:%s", route.Namespace, route.Name)] = &route
+		}
 	}
 
 	kfmrToken := os.Getenv(types2.ModelRegistryTokenEnvVar)
