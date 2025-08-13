@@ -336,10 +336,11 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	buf := bytes.NewBuffer(b)
 	bwriter := bufio.NewWriter(buf)
 	importKey := ""
+	lastUpdateTimeSinceEpoch := ""
 
 	//TODO fill in lifecycle from kfmr k/v pairs perhaps
 	if len(r.kfmrRoute) > 0 {
-		importKey, err = r.processKFMR(ctx, name, is, bwriter, log)
+		importKey, lastUpdateTimeSinceEpoch, err = r.processKFMR(ctx, name, is, bwriter, log)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -383,7 +384,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 		importKey, _ = util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
 	}
 
-	err = r.processBWriter(bwriter, buf, importKey, normilzerType)
+	err = r.processBWriter(bwriter, buf, importKey, normilzerType, lastUpdateTimeSinceEpoch)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -391,7 +392,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType string) error {
+func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType, lastUpdateTimeSinceEpoch string) error {
 	err := bwriter.Flush()
 	if err != nil {
 		return err
@@ -399,7 +400,7 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 
 	httpRC := 0
 	msg := ""
-	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, buf.Bytes())
+	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, lastUpdateTimeSinceEpoch, buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -409,11 +410,11 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 	return nil
 }
 
-func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.NamespacedName, is *serverapiv1beta1.InferenceService, bwriter io.Writer, log logr.Logger) (string, error) {
+func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.NamespacedName, is *serverapiv1beta1.InferenceService, bwriter io.Writer, log logr.Logger) (string, string, error) {
 	ready := r.setupKFMR(ctx)
 	if !ready {
 		log.V(4).Info(fmt.Sprintf("reconciling inferenceservice %s, no kmr routes with ingress", name.String()))
-		return "", nil
+		return "", "", nil
 	}
 
 	var kfmrRMs []openapi.RegisteredModel
@@ -469,12 +470,15 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.format)
 
 						if err != nil {
-							return "", err
+							return "", "", err
 						}
 
-						//TODO iterate on the the REST URI's for our models if multi model?
 						importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
-						return importKey, nil
+						lastUpdateTimeSinceEpoch := mv.GetLastUpdateTimeSinceEpoch()
+						if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
+							lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
+						}
+						return importKey, lastUpdateTimeSinceEpoch, nil
 					}
 				}
 			}
@@ -533,12 +537,15 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.format)
 
 						if err != nil {
-							return "", err
+							return "", "", err
 						}
 
-						//TODO iterate on the the REST URI's for our models if multi model?
 						importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
-						return importKey, nil
+						lastUpdateTimeSinceEpoch := mv.GetLastUpdateTimeSinceEpoch()
+						if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
+							lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
+						}
+						return importKey, lastUpdateTimeSinceEpoch, nil
 
 					}
 
@@ -548,7 +555,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 	}
 
 	// no match to kfmr, but do not return error, as caller can still process this as kserve only
-	return "", nil
+	return "", "", nil
 }
 
 // Start - supplement with background polling as controller relist does not duplicate delete events, and we can be more
@@ -595,6 +602,10 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 			for _, mv := range mva {
 
 				importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
+				lastUpdateTimeSinceEpoch := mv.GetLastUpdateTimeSinceEpoch()
+				if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
+					lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
+				}
 				keys = append(keys, importKey)
 				eb := []byte{}
 				ebuf := bytes.NewBuffer(eb)
@@ -622,7 +633,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					controllerLog.Error(err, "error processing calling backstage printer")
 					continue
 				}
-				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer)
+				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch)
 				if err != nil {
 					controllerLog.Error(err, "error processing KFMR writer")
 					continue

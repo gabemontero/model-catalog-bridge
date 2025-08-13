@@ -2,10 +2,11 @@ package client
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-	"net/http"
 )
 
 type BridgeLocationRESTClient struct {

@@ -5,6 +5,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/kubeflowmodelregistry"
@@ -21,13 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"knative.dev/pkg/apis"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
-	"net/http/httptest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
-	"sync"
-	"testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -245,7 +246,7 @@ func TestStart(t *testing.T) {
 		name          string
 		is            *serverapiv1beta1.InferenceService
 		kfmrSvr       []*httptest.Server
-		expectedKey   string
+		expectedKey   []string
 		expectedValue []string
 	}{
 		{
@@ -260,7 +261,7 @@ func TestStart(t *testing.T) {
 				Status: serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:       []*httptest.Server{kts2},
-			expectedKey:   "model-1_v1",
+			expectedKey:   []string{"model-1_v1"},
 			expectedValue: []string{"description: dummy model 1"},
 		},
 		{
@@ -275,7 +276,7 @@ func TestStart(t *testing.T) {
 				Status: serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:       []*httptest.Server{kts1},
-			expectedKey:   "mnist_v1,mnist_v3",
+			expectedKey:   []string{"mnist_v1", "mnist_v3"},
 			expectedValue: []string{"url: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx"},
 		},
 		{
@@ -290,7 +291,7 @@ func TestStart(t *testing.T) {
 				Status: serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:       []*httptest.Server{kts1, kts2},
-			expectedKey:   "mnist_v1,mnist_v3,model-1_v1",
+			expectedKey:   []string{"mnist_v1", "mnist_v3", "model-1_v1"},
 			expectedValue: []string{"url: https://huggingface.co/tarilabs/mnist/resolve/v20231206163028/mnist.onnx", "description: dummy model 1"},
 		},
 		{
@@ -301,7 +302,7 @@ func TestStart(t *testing.T) {
 				Status:     serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:     []*httptest.Server{kts3},
-			expectedKey: "ggmtest_mnist-v1",
+			expectedKey: []string{"ggmtest_mnist-v1"},
 		},
 		{
 			name: "deployed, kserve only, non kubeflow labels",
@@ -315,7 +316,7 @@ func TestStart(t *testing.T) {
 				Status: serverapiv1beta1.InferenceServiceStatus{},
 			},
 			kfmrSvr:     []*httptest.Server{kts3},
-			expectedKey: "ggmtest_mnist-v1",
+			expectedKey: []string{"ggmtest_mnist-v1"},
 		},
 	} {
 		ctx := context.TODO()
@@ -351,14 +352,15 @@ func TestStart(t *testing.T) {
 			common.AssertEqual(t, true, found)
 			common.AssertEqual(t, true, len(buf.Bytes()) > 0)
 		}
-		if len(tc.expectedKey) > 0 {
+		for _, expectedKey := range tc.expectedKey {
 			found := false
 			callback.Range(func(key, value any) bool {
 				t.Logf(fmt.Sprintf("found key %s for test %s", key, tc.name))
 				if !found {
 					postStr, ok := value.(string)
 					common.AssertEqual(t, ok, true)
-					if strings.Contains(postStr, tc.expectedKey) {
+					if strings.Contains(postStr, expectedKey) {
+						t.Logf("found key %s for test %s from value %s", expectedKey, tc.name, postStr)
 						found = true
 					}
 				}

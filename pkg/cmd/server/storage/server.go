@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
@@ -15,12 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8srest "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"net/http"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 type StorageRESTServer struct {
@@ -39,7 +40,7 @@ type StorageRESTServer struct {
 func NewStorageRESTServer(st types.BridgeStorage, port, bridgeURL, bridgeToken, bkstgToken string, nf types.NormalizerFormat) *StorageRESTServer {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	pushToRHDH := true
+	pushToRHDH := false
 	pushStr := os.Getenv(types.PushToRHDHEnvVar)
 	push, err := strconv.ParseBool(pushStr)
 	if err == nil && len(pushStr) > 0 {
@@ -259,9 +260,10 @@ func (s *StorageRESTServer) handleCatalogUpsertPost(c *gin.Context) {
 	}
 	uri := ""
 	key, uri = util.BuildImportKeyAndURI(segs[0], segs[1], s.format)
-	klog.Infof("Upserting URI %s with key %s with data of len %d", uri, key, len(postBody.Body))
+	klog.Infof("Upserting URI %s with key %s with data of len %d and last epoch %s", uri, key, len(postBody.Body), postBody.LastUpdateTimeSinceEpoch)
 
 	sb := &types.StorageBody{}
+    sb.LastUpdateTimeSinceEpoch = postBody.LastUpdateTimeSinceEpoch
 	sb, err = s.sync(key)
 	if err != nil {
 		klog.Error(err.Error())
