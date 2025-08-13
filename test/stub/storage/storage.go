@@ -1,19 +1,20 @@
 package storage
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"sync"
-	"testing"
+     "encoding/json"
+     "fmt"
+     "io"
+     "net/http"
+     "net/http/httptest"
+     "strings"
+     "sync"
+     "testing"
+
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/server/storage"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+     "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
 )
 
 func SetupBridgeStorageRESTClient(ts *httptest.Server) *storage.BridgeStorageRESTClient {
@@ -87,9 +88,10 @@ func CreateBridgeStorageREST(t *testing.T, called *sync.Map) *httptest.Server {
 					w.WriteHeader(500)
 					return
 				}
-				t.Logf("got buf of len %d", len(data.Body))
-				called.Store(r.URL.Path, string(data.Body))
-				called.Store(r.URL.RawQuery, string(data.Body))
+                bodyStr := string(data.Body)
+				t.Logf("got buf of len %d and storing buf under keys %s and %s with path in body %v rawquery in body %v", len(data.Body), r.URL.Path, r.URL.RawQuery, strings.Contains(bodyStr, r.URL.Path), strings.Contains(bodyStr, r.URL.RawQuery))
+				called.Store(r.URL.Path, bodyStr)
+				called.Store(r.URL.RawQuery, bodyStr)
 				_, _ = w.Write([]byte(fmt.Sprintf(common.TestPostJSONStringOneLinePlusBody, string(data.Body))))
 
 			}
