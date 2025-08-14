@@ -178,9 +178,9 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 			continue
 		}
 		kfmr := &kubeflowmodelregistry.KubeFlowRESTClientWrapper{
-			Token:      kfmrToken,
-			RootURL:    "https://" + kfmrRoute.Status.Ingress[0].Host + bridgerest.KFMR_BASE_URI,
-			RESTClient: resty.New(),
+			Token:           kfmrToken,
+			RootRegistryURL: "https://" + kfmrRoute.Status.Ingress[0].Host + bridgerest.KFMR_BASE_URI,
+			RESTClient:      resty.New(),
 		}
 		kfmr.RESTClient.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 		r.kfmr[key] = kfmr
@@ -337,10 +337,12 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	bwriter := bufio.NewWriter(buf)
 	importKey := ""
 	lastUpdateTimeSinceEpoch := ""
+	var modelCard *string
+	modelCardKey := ""
 
 	//TODO fill in lifecycle from kfmr k/v pairs perhaps
 	if len(r.kfmrRoute) > 0 {
-		importKey, lastUpdateTimeSinceEpoch, err = r.processKFMR(ctx, name, is, bwriter, log)
+		importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, err = r.processKFMR(ctx, name, is, bwriter, log)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -384,7 +386,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 		importKey, _ = util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
 	}
 
-	err = r.processBWriter(bwriter, buf, importKey, normilzerType, lastUpdateTimeSinceEpoch)
+	err = r.processBWriter(bwriter, buf, importKey, normilzerType, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -392,7 +394,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType, lastUpdateTimeSinceEpoch string) error {
+func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *bytes.Buffer, importKey, reconcilerType, lastUpdateTimeSinceEpoch, modelCardKey string, modelCard *string) error {
 	err := bwriter.Flush()
 	if err != nil {
 		return err
@@ -400,7 +402,7 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 
 	httpRC := 0
 	msg := ""
-	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, lastUpdateTimeSinceEpoch, buf.Bytes())
+	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -410,11 +412,11 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 	return nil
 }
 
-func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.NamespacedName, is *serverapiv1beta1.InferenceService, bwriter io.Writer, log logr.Logger) (string, string, error) {
+func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.NamespacedName, is *serverapiv1beta1.InferenceService, bwriter io.Writer, log logr.Logger) (string, string, string, *string, error) {
 	ready := r.setupKFMR(ctx)
 	if !ready {
 		log.V(4).Info(fmt.Sprintf("reconciling inferenceservice %s, no kmr routes with ingress", name.String()))
-		return "", "", nil
+		return "", "", "", nil, nil
 	}
 
 	var kfmrRMs []openapi.RegisteredModel
@@ -470,7 +472,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.format)
 
 						if err != nil {
-							return "", "", err
+							return "", "", "", nil, err
 						}
 
 						importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
@@ -478,7 +480,18 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
 							lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
 						}
-						return importKey, lastUpdateTimeSinceEpoch, nil
+						var modelCard *string
+						modelCardKey := ""
+						for _, ma := range mas {
+							modelCard, err = kfmr.GetModelCard(ma.GetModelSourceGroup(), ma.GetModelSourceName())
+							if err != nil {
+								controllerLog.Error(err, "error getting model card")
+								continue
+							}
+							modelCardKey = ma.GetModelSourceGroup() + ma.GetModelSourceName()
+							break
+						}
+						return importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, nil
 					}
 				}
 			}
@@ -500,7 +513,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						continue
 					}
 
-					if se.Name != nil && *se.Name == is.Namespace {
+					if se.Name == is.Namespace {
 						// FOUND the match !!
 						// reminder based on explanations about model artifact actually being the "root" of their model, and what has been observed in testing,
 						mvId := kfmrIS.GetModelVersionId()
@@ -537,7 +550,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.format)
 
 						if err != nil {
-							return "", "", err
+							return "", "", "", nil, err
 						}
 
 						importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
@@ -545,7 +558,18 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
 							lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
 						}
-						return importKey, lastUpdateTimeSinceEpoch, nil
+						var modelCard *string
+						modelCardKey := ""
+						for _, ma := range mas {
+							modelCard, err = kfmr.GetModelCard(ma.GetModelSourceGroup(), ma.GetModelSourceName())
+							if err != nil {
+								controllerLog.Error(err, "error getting model card")
+								continue
+							}
+							modelCardKey = ma.GetModelSourceGroup() + ma.GetModelSourceName()
+							break
+						}
+						return importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, nil
 
 					}
 
@@ -555,7 +579,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 	}
 
 	// no match to kfmr, but do not return error, as caller can still process this as kserve only
-	return "", "", nil
+	return "", "", "", nil, nil
 }
 
 // Start - supplement with background polling as controller relist does not duplicate delete events, and we can be more
@@ -633,7 +657,21 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					controllerLog.Error(err, "error processing calling backstage printer")
 					continue
 				}
-				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch)
+				var modelCard *string
+				modelCardKey := ""
+				for _, ma := range maa {
+					if len(ma) > 0 {
+						m := ma[0]
+						modelCard, err = kfmr.GetModelCard(m.GetModelSourceGroup(), m.GetModelSourceName())
+						if err != nil {
+							controllerLog.Error(err, "error getting model card")
+						} else {
+							modelCardKey = m.GetModelSourceGroup() + m.GetModelSourceName()
+
+						}
+					}
+				}
+				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
 				if err != nil {
 					controllerLog.Error(err, "error processing KFMR writer")
 					continue

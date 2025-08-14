@@ -1,19 +1,20 @@
 package server
 
 import (
-	"bytes"
-	"github.com/gin-gonic/gin"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
-	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
-	testgin "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/gin-gonic"
-	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/storage"
-	"io"
-	"k8s.io/apimachinery/pkg/util/json"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"testing"
+     "bytes"
+     "io"
+     "net/http"
+     "net/url"
+     "strings"
+     "sync"
+     "testing"
+
+     "github.com/gin-gonic/gin"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/rest"
+     "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
+     testgin "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/gin-gonic"
+     "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/storage"
+     "k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestLoadFromStorage(t *testing.T) {
@@ -86,7 +87,7 @@ func TestHandleCatalogDiscoveryGet(t *testing.T) {
 	} {
 		testWriter := testgin.NewTestResponseWriter()
 		ctx, _ := gin.CreateTestContext(testWriter)
-		ils := &ImportLocationServer{content: tc.content}
+		ils := &ImportLocationServer{content: tc.content, modelcards: map[string]string{}}
 
 		ils.handleCatalogDiscoveryGet(ctx)
 
@@ -102,7 +103,7 @@ func TestHandleCatalogDiscoveryGet(t *testing.T) {
 
 func TestHandleCatalogUpsertPost(t *testing.T) {
 	// define outside of the test loop so we can vet updates vs. creates
-	ils := &ImportLocationServer{content: map[string]*ImportLocation{}}
+	ils := &ImportLocationServer{content: map[string]*ImportLocation{}, modelcards: map[string]string{}}
 	for _, tc := range []struct {
 		name            string
 		reqURL          url.URL
@@ -221,7 +222,7 @@ func TestHandleCatalogDelete(t *testing.T) {
 
 		ctx, eng := gin.CreateTestContext(testWriter)
 		ctx.Request = &http.Request{URL: &tc.reqURL}
-		ils := &ImportLocationServer{content: tc.existingContent}
+		ils := &ImportLocationServer{content: tc.existingContent, modelcards: map[string]string{}}
 		ils.router = eng
 
 		ils.handleCatalogDelete(ctx)

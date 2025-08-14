@@ -189,7 +189,7 @@ func TestReconcile(t *testing.T) {
 			if len(tc.expectedValue) == 0 {
 				found = true
 			}
-			t.Logf(fmt.Sprintf("found key %s for test %s", key, tc.name))
+			t.Logf("found key %s for test %s", key, tc.name)
 			postStr, ok := value.(string)
 			common.AssertEqual(t, ok, true)
 			// note our expected value could be in any of the k/v pairs; we just need to find in one of them
@@ -338,7 +338,7 @@ func TestStart(t *testing.T) {
 		for _, expectedValue := range tc.expectedValue {
 			found := false
 			callback.Range(func(key, value any) bool {
-				t.Logf(fmt.Sprintf("found key %s for test %s", key, tc.name))
+				t.Logf("found key %s for test %s", key, tc.name)
 				if !found {
 					postStr, ok := value.(string)
 					common.AssertEqual(t, ok, true)
@@ -355,7 +355,7 @@ func TestStart(t *testing.T) {
 		for _, expectedKey := range tc.expectedKey {
 			found := false
 			callback.Range(func(key, value any) bool {
-				t.Logf(fmt.Sprintf("found key %s for test %s", key, tc.name))
+				t.Logf("found key %s for test %s", key, tc.name)
 				if !found {
 					postStr, ok := value.(string)
 					common.AssertEqual(t, ok, true)
@@ -528,7 +528,7 @@ func TestStartArchived(t *testing.T) {
 			if len(postStr) == 0 {
 				ok = true
 			}
-			t.Logf(fmt.Sprintf("found key %s value %s for test %s", key, value, tc.name))
+			t.Logf("found key %s value %s for test %s", key, value, tc.name)
 
 			return true
 		})
