@@ -11,12 +11,12 @@ data:
             clientSecret: ${GITHUB__APP__CLIENT__SECRET}
     # start of delta from ai-rhdh-installer
     backend:
-      auth:
-        externalAccess:
-          - type: static
-            options:
-              token: ${RHDH_TOKEN}
-              subject: admin-curl-access
+      # auth:
+        # externalAccess:
+          # - type: static
+            # options:
+              # token: ${RHDH_TOKEN}
+              # subject: admin-curl-access
       reading:
         allow:
           - host: example.com
