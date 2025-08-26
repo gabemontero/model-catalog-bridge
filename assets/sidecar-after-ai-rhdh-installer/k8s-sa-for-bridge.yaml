@@ -57,7 +57,8 @@ kind: RoleBinding
 metadata:
   # if using ODH then change rhoai to odh in the name and namespace here
   name: rhdh-rhoai-dashboard-permissions
-  namespace: rhoai-model-registries
+  namespace: odh-model-registries
+  # namespace: rhoai-model-registries
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

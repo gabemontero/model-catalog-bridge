@@ -74,8 +74,6 @@ spec:
                     value: JsonArrayFormat
                   - name: STORAGE_TYPE
                     value: ConfigMap
-                  - name: PUSH_TO_RHDH
-                    value: true
                   - name: BRIDGE_URL
                     value: http://localhost:9090
                   - name: POD_IP
@@ -105,9 +103,6 @@ spec:
               - env:
                   - name: NORMALIZER_FORMAT
                     value: JsonArrayFormat
-                  - name: MR_ROUTE
-                    # if using ODH then change rhoai to odh in the value here
-                    value: rhoai-model-registries:modelregistry-public-https
                   - name: POD_IP
                     valueFrom:
                       fieldRef:
