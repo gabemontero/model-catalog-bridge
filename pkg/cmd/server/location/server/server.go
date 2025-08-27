@@ -20,11 +20,17 @@ import (
 type ImportLocationServer struct {
 	router     *gin.Engine
 	content    map[string]*ImportLocation
-	modelcards map[string]string
+	modelcards map[string]modelCardMetadata
 	storage    *storage.BridgeStorageRESTClient
 	format     types.NormalizerFormat
 	port       string
 	lock       sync.Mutex
+}
+
+type modelCardMetadata struct {
+	content                  string
+	lastUpdateTimeSinceEpoch string
+	needToUpdate             bool
 }
 
 func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *ImportLocationServer {
@@ -33,13 +39,13 @@ func NewImportLocationServer(stURL, port string, nf types.NormalizerFormat) *Imp
 	cfg, _ := util.GetK8sConfig(&config.Config{})
 	r := gin.Default()
 	i := &ImportLocationServer{
-		router:  r,
-		content: map[string]*ImportLocation{},
-        modelcards: map[string]string{},
-		storage: storage.SetupBridgeStorageRESTClient(stURL, util.GetCurrentToken(cfg)),
-		format:  nf,
-		port:    port,
-		lock:    sync.Mutex{},
+		router:     r,
+		content:    map[string]*ImportLocation{},
+		modelcards: map[string]modelCardMetadata{},
+		storage:    storage.SetupBridgeStorageRESTClient(stURL, util.GetCurrentToken(cfg)),
+		format:     nf,
+		port:       port,
+		lock:       sync.Mutex{},
 	}
 	r.SetTrustedProxies(nil)
 	r.TrustedPlatform = "X-Forwarded-For"
@@ -218,7 +224,20 @@ func (u *ImportLocationServer) handleCatalogUpsertPost(c *gin.Context) {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 	u.content[uriString] = il
-	u.modelcards[postBody.ModelCardKey] = postBody.ModelCard
+	mcm, ok := u.modelcards[postBody.ModelCardKey]
+	if !ok {
+		mcm = modelCardMetadata{
+			content:                  postBody.ModelCard,
+			lastUpdateTimeSinceEpoch: postBody.LastUpdateTimeSinceEpoch,
+			needToUpdate:             true,
+		}
+	} else {
+		if mcm.lastUpdateTimeSinceEpoch != postBody.LastUpdateTimeSinceEpoch {
+			mcm.lastUpdateTimeSinceEpoch = postBody.LastUpdateTimeSinceEpoch
+			mcm.needToUpdate = true
+		}
+	}
+	u.modelcards[postBody.ModelCardKey] = mcm
 	klog.Infof("Upserting URI %s with data of len %d with modelcard key %s and modelcard len %d", uriString, len(postBody.Body), postBody.ModelCardKey, len(postBody.ModelCard))
 	c.Status(http.StatusCreated)
 }
@@ -251,14 +270,20 @@ func (u *ImportLocationServer) handleCatalogDelete(c *gin.Context) {
 }
 
 func (i *ImportLocationServer) handleModelCardGet(c *gin.Context) {
-     i.lock.Lock()
-     defer i.lock.Unlock()
-     key := c.Query(util.KeyQueryParam)
-     content, ok := i.modelcards[key]
-     if !ok {
-          c.Status(http.StatusNotFound)
-          return
-     }
-     c.Data(http.StatusOK, "Content-Type: text/markdown", []byte(content))
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	key := c.Query(util.KeyQueryParam)
+	content, ok := i.modelcards[key]
+	if !ok {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if !content.needToUpdate {
+		c.Status(http.StatusNotModified)
+		return
+	}
+    content.needToUpdate = false
+    i.modelcards[key] = content
+	c.Data(http.StatusOK, "Content-Type: text/markdown", []byte(content.content))
 
 }
