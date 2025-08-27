@@ -87,7 +87,7 @@ func TestHandleCatalogDiscoveryGet(t *testing.T) {
 	} {
 		testWriter := testgin.NewTestResponseWriter()
 		ctx, _ := gin.CreateTestContext(testWriter)
-		ils := &ImportLocationServer{content: tc.content, modelcards: map[string]string{}}
+		ils := &ImportLocationServer{content: tc.content, modelcards: map[string]modelCardMetadata{}}
 
 		ils.handleCatalogDiscoveryGet(ctx)
 
@@ -104,7 +104,7 @@ func TestHandleCatalogDiscoveryGet(t *testing.T) {
 func TestHandleCatalogDiscoveryGetModel(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
-		content           map[string]string
+		content           map[string]modelCardMetadata
 		param             string
 		expectedSC        int
 		expectedBody      string
@@ -119,15 +119,15 @@ func TestHandleCatalogDiscoveryGetModel(t *testing.T) {
 			name:       "invalid key",
 			expectedSC: http.StatusNotFound,
 			param:      "foo",
-			content: map[string]string{
-				"bar": "bar",
+			content: map[string]modelCardMetadata{
+				"bar": {content: "bar", needToUpdate: true},
 			},
 		},
 		{
 			name:       "valid key",
 			expectedSC: http.StatusOK,
-			content: map[string]string{
-				"foo": "bar",
+			content: map[string]modelCardMetadata{
+				"foo": {content: "bar", needToUpdate: true},
 			},
 			param:        "foo",
 			expectedBody: `bar`,
@@ -138,7 +138,7 @@ func TestHandleCatalogDiscoveryGetModel(t *testing.T) {
 		ils := &ImportLocationServer{content: map[string]*ImportLocation{}, modelcards: tc.content}
 
 		req, _ := http.NewRequest(http.MethodGet, "/modelcard?key="+tc.param, nil)
-        ctx.Request = req
+		ctx.Request = req
 
 		ils.handleModelCardGet(ctx)
 
@@ -154,7 +154,7 @@ func TestHandleCatalogDiscoveryGetModel(t *testing.T) {
 
 func TestHandleCatalogUpsertPost(t *testing.T) {
 	// define outside of the test loop so we can vet updates vs. creates
-	ils := &ImportLocationServer{content: map[string]*ImportLocation{}, modelcards: map[string]string{}}
+	ils := &ImportLocationServer{content: map[string]*ImportLocation{}, modelcards: map[string]modelCardMetadata{}}
 	for _, tc := range []struct {
 		name            string
 		reqURL          url.URL
@@ -273,7 +273,7 @@ func TestHandleCatalogDelete(t *testing.T) {
 
 		ctx, eng := gin.CreateTestContext(testWriter)
 		ctx.Request = &http.Request{URL: &tc.reqURL}
-		ils := &ImportLocationServer{content: tc.existingContent, modelcards: map[string]string{}}
+		ils := &ImportLocationServer{content: tc.existingContent, modelcards: map[string]modelCardMetadata{}}
 		ils.router = eng
 
 		ils.handleCatalogDelete(ctx)
