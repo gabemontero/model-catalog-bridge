@@ -118,6 +118,7 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 	mrRoute := os.Getenv(types2.ModelRegistryRouteEnvVar)
 	rr.Replace(mrRoute)
 	routeTuples := strings.Split(mrRoute, ",")
+	klog.Infof("setupKFMR route env var %s", mrRoute)
 	for _, routeTuple := range routeTuples {
 		if len(routeTuple) == 0 {
 			continue
@@ -154,6 +155,7 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 		}
 	}
 
+	klog.Infof("setupKFMR env var route list len %d", len(r.kfmrRegistryRoute))
 	if len(r.kfmrRegistryRoute) == 0 {
 		// try label based query
 		routes, _ := r.routeClient.Routes(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
@@ -163,15 +165,15 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 			return false
 		}
 		for _, route := range routes.Items {
-             key := fmt.Sprintf("%s:%s", route.Namespace, route.Name)
-             for _, owner := range route.OwnerReferences {
-                  key = fmt.Sprintf("%s/%s", owner.Kind, owner.Name)
-                  break
-             }
+			key := fmt.Sprintf("%s:%s", route.Namespace, route.Name)
+			klog.Infof("setupKFMR query found route %s", key)
 			if strings.Contains(route.Name, "catalog") {
-				r.kfmrCatalogRoute[key] = &route
-                continue
+				// catalog is suppose to be a singleton, unlike multiple registries
+				klog.Infof("setupKFMR found catalog %s", route.Name)
+				r.kfmrCatalogRoute = &route
+				continue
 			}
+			klog.Infof("setupKFMR found registry %s storing into map with key %s", route.Name, key)
 			r.kfmrRegistryRoute[key] = &route
 		}
 	}
@@ -183,6 +185,7 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 	}
 	for key, kfmrRoute := range r.kfmrRegistryRoute {
 		_, ok := r.kfmr[key]
+		klog.Infof("setupKFMR loop through routes check against kfmr key %s ok %v", key, ok)
 		if ok {
 			continue
 		}
@@ -191,11 +194,11 @@ func (r *RHOAINormalizerReconcile) setupKFMR(ctx context.Context) bool {
 			RootRegistryURL: "https://" + kfmrRoute.Status.Ingress[0].Host + bridgerest.KFMR_BASE_URI,
 			RESTClient:      resty.New(),
 		}
-        catalogRoute, ok2 := r.kfmrCatalogRoute[key]
-        if ok2 && catalogRoute != nil {
-             kfmr.RootCatalogURL = "https://" + catalogRoute.Status.Ingress[0].Host + bridgerest.KRMR_CATALOG_BASE_URI
-        }
+		if r.kfmrCatalogRoute != nil {
+			kfmr.RootCatalogURL = "https://" + r.kfmrCatalogRoute.Status.Ingress[0].Host + bridgerest.KRMR_CATALOG_BASE_URI
+		}
 		kfmr.RESTClient.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		klog.Infof("setupKFMR storing route %s into kfmr", key)
 		r.kfmr[key] = kfmr
 	}
 	return true
@@ -255,7 +258,6 @@ func SetupController(ctx context.Context, mgr ctrl.Manager, cfg *rest.Config, pp
 	reconciler.myNS = util.GetCurrentProject()
 
 	reconciler.kfmrRegistryRoute = map[string]*routev1.Route{}
-	reconciler.kfmrCatalogRoute = map[string]*routev1.Route{}
 	reconciler.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
 	reconciler.setupKFMR(ctx)
 
@@ -308,7 +310,7 @@ type RHOAINormalizerReconcile struct {
 	eventRecorder     record.EventRecorder
 	k8sToken          string
 	kfmrRegistryRoute map[string]*routev1.Route
-	kfmrCatalogRoute  map[string]*routev1.Route
+	kfmrCatalogRoute  *routev1.Route
 	myNS              string
 	routeClient       *routeclient.RouteV1Client
 	kfmr              map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper
@@ -499,17 +501,18 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						}
 						var modelCard *string
 						modelCardKey := ""
-                        if len(kfmr.RootCatalogURL) > 0 {
-                             for _, ma := range mas {
-                                  modelCard, err = kfmr.GetModelCard(ma.GetModelSourceClass(), ma.GetModelSourceGroup(), ma.GetModelSourceName())
-                                  if err != nil {
-                                       controllerLog.Error(err, "error getting model card")
-                                       continue
-                                  }
-                                  modelCardKey = replacer.Replace(ma.GetModelSourceClass()) + replacer.Replace(ma.GetModelSourceGroup()) + replacer.Replace(ma.GetModelSourceName())
-                                  break
-                             }
-                        }
+						if len(kfmr.RootCatalogURL) > 0 {
+							for _, ma := range mas {
+								modelCard, err = kfmr.GetModelCard(ma.GetModelSourceClass(), ma.GetModelSourceGroup(), ma.GetModelSourceName())
+								if err != nil {
+									controllerLog.Error(err, "error getting model card")
+									continue
+								}
+								modelCardKey = replacer.Replace(ma.GetModelSourceClass()) + replacer.Replace(ma.GetModelSourceGroup()) + replacer.Replace(ma.GetModelSourceName())
+								klog.Infof("processKFMR built modelCardKey %s", modelCardKey)
+								break
+							}
+						}
 						return importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, nil
 					}
 				}
@@ -579,17 +582,18 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 						}
 						var modelCard *string
 						modelCardKey := ""
-                        if len(kfmr.RootCatalogURL) > 0 {
-                             for _, ma := range mas {
-                                  modelCard, err = kfmr.GetModelCard(ma.GetModelSourceClass(), ma.GetModelSourceGroup(), ma.GetModelSourceName())
-                                  if err != nil {
-                                       controllerLog.Error(err, "error getting model card")
-                                       continue
-                                  }
-                                  modelCardKey = ma.GetModelSourceGroup() + ma.GetModelSourceName()
-                                  break
-                             }
-                        }
+						if len(kfmr.RootCatalogURL) > 0 {
+							for _, ma := range mas {
+								modelCard, err = kfmr.GetModelCard(ma.GetModelSourceClass(), ma.GetModelSourceGroup(), ma.GetModelSourceName())
+								if err != nil {
+									controllerLog.Error(err, "error getting model card")
+									continue
+								}
+								modelCardKey = ma.GetModelSourceGroup() + ma.GetModelSourceName()
+								klog.V(4).Infof("processKFMR built modelCardKey %s", modelCardKey)
+								break
+							}
+						}
 						return importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, nil
 
 					}
@@ -624,6 +628,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 
 	replacer := strings.NewReplacer(" ", "")
 	keys := []string{}
+	klog.V(4).Infof("innerStart len kfmr %d", len(r.kfmr))
 	for _, kfmr := range r.kfmr {
 		var err error
 		var rms []openapi.RegisteredModel
@@ -636,6 +641,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 			controllerLog.Error(err, "err looping over KFMR")
 			return
 		}
+		klog.V(4).Infof("loopOverKFMR len rms %d mvs %d mas %d", len(rms), len(mvs), len(mas))
 		for _, rm := range rms {
 			mva, ok := mvs[util.SanitizeName(rm.Name)]
 			if !ok {
@@ -681,20 +687,20 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				}
 				var modelCard *string
 				modelCardKey := ""
-                if len(kfmr.RootCatalogURL) > 0 {
-                     for _, ma := range maa {
-                          if len(ma) > 0 {
-                               m := ma[0]
-                               modelCard, err = kfmr.GetModelCard(m.GetModelSourceClass(), m.GetModelSourceGroup(), m.GetModelSourceName())
-                               if err != nil {
-                                    controllerLog.Error(err, "error getting model card")
-                               } else {
-                                    modelCardKey = replacer.Replace(m.GetModelSourceClass()) + replacer.Replace(m.GetModelSourceGroup()) + replacer.Replace(m.GetModelSourceName())
-
-                               }
-                          }
-                     }
-                }
+				if len(kfmr.RootCatalogURL) > 0 {
+					for _, ma := range maa {
+						if len(ma) > 0 {
+							m := ma[0]
+							modelCard, err = kfmr.GetModelCard(m.GetModelSourceClass(), m.GetModelSourceGroup(), m.GetModelSourceName())
+							if err != nil {
+								controllerLog.Error(err, "error getting model card")
+							} else {
+								modelCardKey = replacer.Replace(m.GetModelSourceClass()) + replacer.Replace(m.GetModelSourceGroup()) + replacer.Replace(m.GetModelSourceName())
+								klog.V(4).Infof("innerStart built modelCardKey %s", modelCardKey)
+							}
+						}
+					}
+				}
 				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
 				if err != nil {
 					controllerLog.Error(err, "error processing KFMR writer")
