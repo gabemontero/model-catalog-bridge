@@ -174,7 +174,6 @@ func TestReconcile(t *testing.T) {
 		ctx := context.TODO()
 		objs := []client.Object{tc.is}
 		r.kfmrRegistryRoute = map[string]*routev1.Route{}
-		r.kfmrCatalogRoute = map[string]*routev1.Route{}
 		r.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
 		if tc.kfmrSvr != nil {
 			cfg := &config.Config{}
@@ -184,7 +183,7 @@ func TestReconcile(t *testing.T) {
 		r.client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 		if tc.route != nil {
 			r.kfmrRegistryRoute[tc.name] = tc.route
-			r.kfmrCatalogRoute[tc.name] = tc.route
+			r.kfmrCatalogRoute = tc.route
 		}
 		result, err := r.Reconcile(ctx, reconcile.Request{types.NamespacedName{Namespace: tc.is.Namespace, Name: tc.is.Name}})
 		common.AssertError(t, err)
@@ -236,14 +235,13 @@ func TestStart(t *testing.T) {
 		k8sToken:      "",
 		myNS:          "",
 		routeClient:   nil,
-		kfmrCatalogRoute: map[string]*routev1.Route{
-			"foo": &routev1.Route{
-				Spec: routev1.RouteSpec{
-					Host: "http://foo.com",
-				},
-				Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
+		kfmrCatalogRoute: &routev1.Route{
+			Spec: routev1.RouteSpec{
+				Host: "http://foo.com",
 			},
+			Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
 		},
+
 		kfmrRegistryRoute: map[string]*routev1.Route{
 			"foo": &routev1.Route{
 				Spec: routev1.RouteSpec{
@@ -339,7 +337,6 @@ func TestStart(t *testing.T) {
 	} {
 		ctx := context.TODO()
 		objs := []client.Object{tc.is}
-		r.kfmrCatalogRoute = map[string]*routev1.Route{}
 		r.kfmrRegistryRoute = map[string]*routev1.Route{}
 		r.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
 		for i, kfmrSvr := range tc.kfmrSvr {
@@ -417,14 +414,13 @@ func TestStart_JsonArray_MultiVersion(t *testing.T) {
 		k8sToken:      "",
 		myNS:          "",
 		routeClient:   nil,
-		kfmrCatalogRoute: map[string]*routev1.Route{
-			"foo": &routev1.Route{
-				Spec: routev1.RouteSpec{
-					Host: "http://foo.com",
-				},
-				Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
+		kfmrCatalogRoute: &routev1.Route{
+			Spec: routev1.RouteSpec{
+				Host: "http://foo.com",
 			},
+			Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
 		},
+
 		kfmrRegistryRoute: map[string]*routev1.Route{
 			"foo": &routev1.Route{
 				Spec: routev1.RouteSpec{
@@ -468,7 +464,6 @@ func TestStart_JsonArray_MultiVersion(t *testing.T) {
 	} {
 		ctx := context.TODO()
 		objs := []client.Object{tc.is}
-		r.kfmrCatalogRoute = map[string]*routev1.Route{}
 		r.kfmrRegistryRoute = map[string]*routev1.Route{}
 		r.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
 		for i, kfmrSvr := range tc.kfmrSvr {
@@ -522,14 +517,13 @@ func TestStartArchived(t *testing.T) {
 		k8sToken:      "",
 		myNS:          "",
 		routeClient:   nil,
-		kfmrCatalogRoute: map[string]*routev1.Route{
-			"foo": &routev1.Route{
-				Spec: routev1.RouteSpec{
-					Host: "http://foo.com",
-				},
-				Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
+		kfmrCatalogRoute: &routev1.Route{
+			Spec: routev1.RouteSpec{
+				Host: "http://foo.com",
 			},
+			Status: routev1.RouteStatus{Ingress: []routev1.RouteIngress{{}}},
 		},
+
 		kfmrRegistryRoute: map[string]*routev1.Route{
 			"foo": &routev1.Route{
 				Spec: routev1.RouteSpec{
@@ -553,7 +547,6 @@ func TestStartArchived(t *testing.T) {
 		ctx := context.TODO()
 		cfg := &config.Config{}
 		r.kfmrRegistryRoute = map[string]*routev1.Route{}
-		r.kfmrCatalogRoute = map[string]*routev1.Route{}
 		r.kfmr = map[string]*kubeflowmodelregistry.KubeFlowRESTClientWrapper{}
 		kfmr.SetupKubeflowTestRESTClient(kts1, cfg)
 		r.kfmr[tc.name] = kubeflowmodelregistry.SetupKubeflowRESTClient(cfg)
