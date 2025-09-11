@@ -271,7 +271,10 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 
 	kfmrIS := openapi.InferenceService{}
 	foundInferenceService := false
+	klog.V(4).Infof("kfmr:GetModelServer len kfmr infsvcs %d", len(m.InferenceServices))
 	for isidx, is := range m.InferenceServices {
+		klog.V(4).Infof("kfmr:GetModelServer kfmr infsvc %s comparing its regmodid %s with regmod id %s",
+			is.GetName(), is.RegisteredModelId, m.RegisteredModel.GetId())
 		if is.RegisteredModelId == m.RegisteredModel.GetId() {
 			infSvcIdx = isidx
 			kfmrIS = is
@@ -279,6 +282,8 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 			break
 		}
 	}
+
+	klog.V(4).Infof("kfmr:GetModelServer found infsvcs %v", foundInferenceService)
 
 	if !foundInferenceService && m.Kis == nil {
 		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
@@ -289,6 +294,8 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 
 	mas := []openapi.ModelArtifact{}
 	for mvidx, mv := range m.ModelVersions {
+		klog.V(4).Infof("kfmr:GetModelServer m.Kis != nil %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v",
+			m.Kis != nil, mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == kfmrIS.GetModelVersionId(), mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == kfmrIS.GetModelVersionId())
 		switch {
 		// in case kubeflow/kserve reconciliation is not working
 		case m.Kis != nil && util.KServeInferenceServiceMapping(m.RegisteredModel.Name, mv.GetName(), m.Kis.Name):
@@ -301,6 +308,7 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		}
 	}
 
+	klog.V(4).Infof("kfmr:GetModelServer found infsvcs %v", foundInferenceService)
 	if !foundInferenceService {
 		return nil
 	}
@@ -891,6 +899,7 @@ func (pop *CommonPopulator) GetInferenceServerByRegModelModelVersionName() *serv
 			iss = append(iss, isList.Items...)
 		}
 	}
+	klog.V(4).Infof("commonPop:GetInferenceServerByRegModelModelVersionName found %d kserve infsvcs with %d modelvers", len(iss), len(pop.ModelVersions))
 	for _, mv := range pop.ModelVersions {
 		for _, is := range iss {
 			if util.KServeInferenceServiceMapping(pop.RegisteredModel.Name, mv.Name, is.Name) {

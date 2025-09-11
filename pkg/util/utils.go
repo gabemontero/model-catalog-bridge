@@ -128,5 +128,6 @@ func KServeInferenceServiceMapping(rName, mName, isName string) bool {
 	mName = replacer.Replace(mName)
 	mName = SanitizeName(mName)
 	key := fmt.Sprintf("%s-%s", rName, mName)
+    klog.Infof("KServeInferenceServiceMapping rName %s mName %s isName %s make key %s found %v", rName, mName, isName, key, key == isName)
 	return key == isName
 }
