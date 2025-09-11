@@ -329,6 +329,7 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 
 	is := &serverapiv1beta1.InferenceService{}
 	name := types.NamespacedName{Namespace: request.Namespace, Name: request.Name}
+	klog.V(4).Infof("Reconcile entry %s", name.String())
 	err := r.client.Get(ctx, name, is)
 	if err != nil && !errors.IsNotFound(err) {
 		return reconcile.Result{}, err
@@ -356,6 +357,8 @@ func (r *RHOAINormalizerReconcile) Reconcile(ctx context.Context, request reconc
 	lastUpdateTimeSinceEpoch := ""
 	var modelCard *string
 	modelCardKey := ""
+
+	klog.V(4).Infof("Reconcile processing/found %s", name.String())
 
 	//TODO fill in lifecycle from kfmr k/v pairs perhaps
 	if len(r.kfmrRegistryRoute) > 0 {
@@ -430,38 +433,44 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 }
 
 func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.NamespacedName, is *serverapiv1beta1.InferenceService, bwriter io.Writer, log logr.Logger) (string, string, string, *string, error) {
+	klog.V(4).Infof("processKFMR entry %s", name.String())
 	ready := r.setupKFMR(ctx)
 	if !ready {
 		log.V(4).Info(fmt.Sprintf("reconciling inferenceservice %s, no kmr routes with ingress", name.String()))
 		return "", "", "", nil, nil
 	}
 
+	klog.V(4).Infof("processKFMR have kfmr entry %s", name.String())
 	replacer := strings.NewReplacer(" ", "")
 
 	var kfmrRMs []openapi.RegisteredModel
 	var kfmrISs []openapi.InferenceService
-	for _, kfmr := range r.kfmr {
+	for k, kfmr := range r.kfmr {
 		rms, err := kfmr.ListRegisteredModels()
 		if err != nil {
 			log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error listing kfmr registered models", name.String()))
 			// if we cannot fetch registered models, we won't bother with inference services
 			continue
 		}
+		klog.V(4).Infof("processKFMR num registered models %d with model registry %s", len(rms), k)
 		kfmrRMs = append(kfmrRMs, rms...)
 		iss, err := kfmr.ListInferenceServices()
 		if err != nil {
 			log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error listing kfmr registered models", name.String()))
 		}
+		klog.V(4).Infof("processKFMR num inference service from %s is %d", k, len(iss))
 		kfmrISs = append(kfmrISs, iss...)
 		// if for some reason kserve/kubeflow reconciliation is not working and there are no kubeflow inference services,
 		// let's match up based on registered model / model version name
 		if len(kfmrISs) == 0 {
+			klog.V(4).Infof("processKFMR in no kubeflow inference service path for registry %s", k)
 			for _, rm := range kfmrRMs {
 				mvs := []openapi.ModelVersion{}
 				mvs, err = kfmr.ListModelVersions(rm.GetId())
 				if err != nil {
 					log.Error(err, fmt.Sprintf("reconciling inferenceservice %s, error list kfmr model version %s", name.String(), rm.GetId()))
 				}
+				klog.V(4).Infof("processKFMR num model versions %d with model registry %s and registered model %s", len(mvs), k, rm.GetId())
 				for _, mv := range mvs {
 					if util.KServeInferenceServiceMapping(rm.Name, mv.Name, is.Name) {
 						// let's go with this one
@@ -475,6 +484,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							log.Info(fmt.Sprintf("either mv %#v or mas %#v is nil, bypassing CallBackstagePrinters", mv, mas))
 							continue
 						}
+
+						klog.V(4).Infof("processKFMR num model artifacts %d with model registry %s, registered model %s and model version %s", len(mas), k, rm.GetId(), mv.GetId())
 
 						err = kubeflowmodelregistry.CallBackstagePrinters(ctx,
 							r.defaultOwner,
@@ -519,6 +530,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 			}
 		}
 
+		klog.V(4).Infof("processKFMR found kubeflow inference service while processing kserve inference service %s", name.String())
+
 		for _, rm := range kfmrRMs {
 			if rm.Id == nil {
 				log.Info(fmt.Sprintf("reconciling inferenceservice %s, registered model %s has no ID", name.String(), rm.Name))
@@ -526,8 +539,12 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 			}
 
 			for _, kfmrIS := range kfmrISs {
+				klog.V(4).Infof("processKFMR seeing if kubeflow infsvc with id %s and reg model id %s map to reg model %s and kserve infsvc %s",
+					kfmrIS.GetId(), kfmrIS.GetRegisteredModelId(), rm.GetId(), is.Name)
 				if kfmrIS.Id != nil && kfmrIS.RegisteredModelId == *rm.Id && strings.HasPrefix(kfmrIS.GetName(), is.Name) {
 					seId := kfmrIS.GetServingEnvironmentId()
+					klog.V(4).Infof("processKFMR kserve infsvc name %s match, check ns %s and kubeflor servenv %s",
+						is.Name, is.Namespace, seId)
 					var se *openapi.ServingEnvironment
 					se, err = kfmr.GetServingEnvironment(seId)
 					if err != nil {
@@ -536,6 +553,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 					}
 
 					if se.Name == is.Namespace {
+						klog.V(4).Infof("processKFMR matched kserve infersvc %s", name.String())
 						// FOUND the match !!
 						// reminder based on explanations about model artifact actually being the "root" of their model, and what has been observed in testing,
 						mvId := kfmrIS.GetModelVersionId()
@@ -594,6 +612,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 								break
 							}
 						}
+						klog.V(4).Infof("processKFMR kserve infsvc %s returning importKey %s epoc %s mcKey %s mc no nil %v",
+							name.String(), importKey, modelCardKey, modelCardKey, modelCard != nil)
 						return importKey, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, nil
 
 					}
@@ -624,7 +644,7 @@ func (r *RHOAINormalizerReconcile) Start(ctx context.Context) error {
 
 func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Buffer, bwriter *bufio.Writer) {
 	r.setupKFMR(ctx)
-	// we do not punt if there is no kfmr so as to handle the kserve only scenario
+	// we do not punt if there is no kfmr to handle the kserve only scenario
 
 	replacer := strings.NewReplacer(" ", "")
 	keys := []string{}
@@ -641,19 +661,22 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 			controllerLog.Error(err, "err looping over KFMR")
 			return
 		}
-		klog.V(4).Infof("loopOverKFMR len rms %d mvs %d mas %d", len(rms), len(mvs), len(mas))
+		klog.V(4).Infof("innerStart len rms %d mvs %d mas %d", len(rms), len(mvs), len(mas))
 		for _, rm := range rms {
 			mva, ok := mvs[util.SanitizeName(rm.Name)]
 			if !ok {
+				klog.V(4).Infof("innerStarat mvs rm disconnect %s", rm.Name)
 				continue
 			}
 			maa, ok2 := mas[util.SanitizeName(rm.Name)]
 			if !ok2 {
+				klog.V(4).Infof("innerStarat mas rm disconnect %s", rm.Name)
 				continue
 			}
 			for _, mv := range mva {
 
 				importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
+				klog.V(4).Infof("innerStart importKey %s from rm %s mv %s format %v", importKey, rm.Name, mv.Name, r.format)
 				lastUpdateTimeSinceEpoch := mv.GetLastUpdateTimeSinceEpoch()
 				if rm.GetLastUpdateTimeSinceEpoch() > lastUpdateTimeSinceEpoch {
 					lastUpdateTimeSinceEpoch = rm.GetLastUpdateTimeSinceEpoch()
@@ -679,6 +702,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						mvISL = append(mvISL, is)
 					}
 				}
+				klog.V(4).Infof("innerStart total num kubeflow infsvc %d num matched to model version %d", len(isl), len(mvISL))
 				// only include this model version vs. whole array to line up with our importKey
 				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, []openapi.ModelVersion{mv}, maa, mvISL, nil, kfmr, r.client, ewriter, r.format)
 				if err != nil {
@@ -734,6 +758,8 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 		if !skip {
 			// we'll let the reconcile loop build the entry; let's just add the key for the current key set call
 			importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(is.Namespace), util.SanitizeName(is.Name), r.format)
+			klog.V(4).Infof("innerStart importKey %s for kserver infsvc %s:%s format %v",
+				importKey, is.Namespace, is.Name, r.format)
 			keys = append(keys, importKey)
 		}
 	}
