@@ -444,9 +444,9 @@ func TestStart_JsonArray_MultiVersion(t *testing.T) {
 			name: "deployed with multiple registries, with inference_service and serving_environments added, but also not deployed, only registered model, model version, model artifact",
 			is: &serverapiv1beta1.InferenceService{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mnist-v1",
+					Name:      "mnist-v1-random-suffix",
 					Namespace: "ggmtest",
-					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1"},
+					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1", bridgerest.INF_SVC_MV_ID_LABEL: "2"},
 				},
 				Spec: serverapiv1beta1.InferenceServiceSpec{},
 				Status: serverapiv1beta1.InferenceServiceStatus{

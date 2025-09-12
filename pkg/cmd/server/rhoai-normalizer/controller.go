@@ -472,7 +472,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 				}
 				klog.V(4).Infof("processKFMR num model versions %d with model registry %s and registered model %s", len(mvs), k, rm.GetId())
 				for _, mv := range mvs {
-					if util.KServeInferenceServiceMapping(rm.Name, mv.Name, is.Name) {
+					if util.KServeInferenceServiceMapping(rm.GetId(), mv.GetId(), is) {
 						// let's go with this one
 						var mas []openapi.ModelArtifact
 						mas, err = kfmr.ListModelArtifacts(mv.GetId())
