@@ -29,6 +29,7 @@ import (
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -494,7 +495,7 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							//TODO deal with multiple versions
 							[]openapi.ModelVersion{mv},
 							map[string][]openapi.ModelArtifact{mv.GetId(): mas},
-							[]openapi.InferenceService{},
+							nil,
 							is,
 							kfmr,
 							r.client,
@@ -579,10 +580,9 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.defaultOwner,
 							r.defaultLifecycle,
 							&rm,
-							//TODO deal with multiple versions
 							[]openapi.ModelVersion{*mv},
 							map[string][]openapi.ModelArtifact{mvId: mas},
-							[]openapi.InferenceService{kfmrIS},
+							&kfmrIS,
 							is,
 							kfmr,
 							r.client,
@@ -703,32 +703,60 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					}
 				}
 				klog.V(4).Infof("innerStart total num kubeflow infsvc %d num matched to model version %d", len(isl), len(mvISL))
-				// only include this model version vs. whole array to line up with our importKey
-				err = kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, &rm, []openapi.ModelVersion{mv}, maa, mvISL, nil, kfmr, r.client, ewriter, r.format)
-				if err != nil {
-					controllerLog.Error(err, "error processing calling backstage printer")
-					continue
-				}
-				var modelCard *string
-				modelCardKey := ""
-				if len(kfmr.RootCatalogURL) > 0 {
-					for _, ma := range maa {
-						if len(ma) > 0 {
-							m := ma[0]
-							modelCard, err = kfmr.GetModelCard(m.GetModelSourceClass(), m.GetModelSourceGroup(), m.GetModelSourceName())
-							if err != nil {
-								controllerLog.Error(err, "error getting model card")
-							} else {
-								modelCardKey = replacer.Replace(m.GetModelSourceClass()) + replacer.Replace(m.GetModelSourceGroup()) + replacer.Replace(m.GetModelSourceName())
-								klog.V(4).Infof("innerStart built modelCardKey %s", modelCardKey)
-							}
-						}
+				if len(mvISL) == 0 {
+					err = r.innerStartCallBackstagePrinters(ctx,
+						kfmr,
+						&rm,
+						&mv,
+						nil,
+						nil,
+						maa,
+						replacer,
+						ewriter,
+						ebuf,
+						importKey,
+						lastUpdateTimeSinceEpoch)
+					if err != nil {
+						continue
 					}
 				}
-				err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
-				if err != nil {
-					controllerLog.Error(err, "error processing KFMR writer")
-					continue
+				for _, kis := range mvISL {
+					var kserveIS *serverapiv1beta1.InferenceService
+					isList := serverapiv1beta1.InferenceServiceList{}
+					selector := labels.SelectorFromSet(map[string]string{
+						bridgerest.INF_SVC_RM_ID_LABEL:      rm.GetId(),
+						bridgerest.INF_SVC_MV_ID_LABEL:      mv.GetId(),
+						bridgerest.INF_SVC_INF_SVC_ID_LABEL: kis.GetId(),
+					})
+					err = r.client.List(ctx, &isList, &client.ListOptions{
+						LabelSelector: selector,
+					})
+					if err != nil {
+						klog.V(4).Infof("innerStart kserve infsvc fetch from rm %s mv %s kubeflow is %s produced error: %s",
+							rm.GetId(), mv.GetId(), kis.GetId(), err.Error())
+					} else {
+						if len(isList.Items) > 0 {
+							kserveIS = &isList.Items[0]
+							klog.V(4).Infof("innerStart found kserver infsvc %s:%s from rm %s mv %s kubeflow is %s",
+								kserveIS.Namespace, kserveIS.Name, rm.GetId(), mv.GetId(), kis.GetId())
+						}
+					}
+
+					err = r.innerStartCallBackstagePrinters(ctx,
+						kfmr,
+						&rm,
+						&mv,
+						&kis,
+						kserveIS,
+						maa,
+						replacer,
+						ewriter,
+						ebuf,
+						importKey,
+						lastUpdateTimeSinceEpoch)
+					if err != nil {
+						continue
+					}
 				}
 			}
 		}
@@ -775,4 +803,46 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 		controllerLog.Error(fmt.Errorf("post to storage returned rc %d: %s", rc, msg), "bad rc updating current key set")
 	}
 
+}
+
+func (r *RHOAINormalizerReconcile) innerStartCallBackstagePrinters(ctx context.Context,
+	kfmr *kubeflowmodelregistry.KubeFlowRESTClientWrapper,
+	rm *openapi.RegisteredModel,
+	mv *openapi.ModelVersion,
+	isl *openapi.InferenceService,
+	is *serverapiv1beta1.InferenceService,
+	maa map[string][]openapi.ModelArtifact,
+	replacer *strings.Replacer,
+	ewriter *bufio.Writer,
+	ebuf *bytes.Buffer,
+	importKey string,
+	lastUpdateTimeSinceEpoch string) error {
+	// only include this model version vs. whole array to line up with our importKey
+	err := kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, rm, []openapi.ModelVersion{*mv}, maa, isl, is, kfmr, r.client, ewriter, r.format)
+	if err != nil {
+		controllerLog.Error(err, "error processing calling backstage printer")
+		return err
+	}
+	var modelCard *string
+	modelCardKey := ""
+	if len(kfmr.RootCatalogURL) > 0 {
+		for _, ma := range maa {
+			if len(ma) > 0 {
+				m := ma[0]
+				modelCard, err = kfmr.GetModelCard(m.GetModelSourceClass(), m.GetModelSourceGroup(), m.GetModelSourceName())
+				if err != nil {
+					controllerLog.Error(err, "error getting model card")
+				} else {
+					modelCardKey = replacer.Replace(m.GetModelSourceClass()) + replacer.Replace(m.GetModelSourceGroup()) + replacer.Replace(m.GetModelSourceName())
+					klog.V(4).Infof("innerStart built modelCardKey %s", modelCardKey)
+				}
+			}
+		}
+	}
+	err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
+	if err != nil {
+		controllerLog.Error(err, "error processing KFMR writer")
+		return err
+	}
+	return nil
 }

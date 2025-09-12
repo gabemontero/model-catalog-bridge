@@ -270,7 +270,7 @@ func TestStart(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "faa",
 					Name:      "bor",
-					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1"},
+					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1", bridgerest.INF_SVC_MV_ID_LABEL: "2", bridgerest.INF_SVC_INF_SVC_ID_LABEL: "4"},
 				},
 				Spec:   serverapiv1beta1.InferenceServiceSpec{},
 				Status: serverapiv1beta1.InferenceServiceStatus{},
@@ -285,7 +285,7 @@ func TestStart(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mnist-v1",
 					Namespace: "ggmtest",
-					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1"},
+					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1", bridgerest.INF_SVC_MV_ID_LABEL: "2", bridgerest.INF_SVC_INF_SVC_ID_LABEL: "4"},
 				},
 				Spec:   serverapiv1beta1.InferenceServiceSpec{},
 				Status: serverapiv1beta1.InferenceServiceStatus{},
@@ -301,7 +301,7 @@ func TestStart(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mnist-v1",
 					Namespace: "ggmtest",
-					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1"},
+					Labels:    map[string]string{bridgerest.INF_SVC_RM_ID_LABEL: "1", bridgerest.INF_SVC_MV_ID_LABEL: "2", bridgerest.INF_SVC_INF_SVC_ID_LABEL: "4"},
 				},
 				Spec:   serverapiv1beta1.InferenceServiceSpec{},
 				Status: serverapiv1beta1.InferenceServiceStatus{},

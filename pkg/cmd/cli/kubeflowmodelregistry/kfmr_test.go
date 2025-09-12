@@ -158,8 +158,10 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 			maa, ok2 := mas[util.SanitizeName(rm.Name)]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
-			common.AssertError(t, err)
+			for _, is := range isl {
+				err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, &is, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+				common.AssertError(t, err)
+			}
 			bwriter.Flush()
 			// so the order of the tags array is random so we can't just do json as a string compare, so we have to
 			// hydrate back to a &golang.ModelCatalog to compare fields
@@ -333,8 +335,10 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 			b := []byte{}
 			buf := bytes.NewBuffer(b)
 			bwriter := bufio.NewWriter(buf)
-			err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
-			common.AssertError(t, err)
+			for _, is := range isl {
+				err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, &is, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+				common.AssertError(t, err)
+			}
 			bwriter.Flush()
 			testMc, ok := tc.outMc[rm.GetId()]
 			common.AssertEqual(t, true, ok)
@@ -401,8 +405,10 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 			maa, ok2 := mas[util.SanitizeName(rm.Name)]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
-			common.AssertError(t, err)
+			for _, is := range isl {
+				err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, &is, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
+				common.AssertError(t, err)
+			}
 		}
 		bwriter.Flush()
 		outstr := buf.String()

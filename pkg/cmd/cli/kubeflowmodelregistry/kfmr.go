@@ -265,27 +265,12 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 }
 
 func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
-	infSvcIdx := 0
 	mvIndex := 0
 	maIndex := 0
 
-	kfmrIS := openapi.InferenceService{}
-	foundInferenceService := false
-	klog.V(4).Infof("kfmr:GetModelServer len kfmr infsvcs %d", len(m.InferenceServices))
-	for isidx, is := range m.InferenceServices {
-		klog.V(4).Infof("kfmr:GetModelServer kfmr infsvc %s comparing its regmodid %s with regmod id %s",
-			is.GetName(), is.RegisteredModelId, m.RegisteredModel.GetId())
-		if is.RegisteredModelId == m.RegisteredModel.GetId() {
-			infSvcIdx = isidx
-			kfmrIS = is
-			foundInferenceService = true
-			break
-		}
-	}
+	klog.V(4).Infof("kfmr:GetModelServer kubeflow infsvc found %v kserve infsvc found %v", m.InferenceService != nil, m.Kis != nil)
 
-	klog.V(4).Infof("kfmr:GetModelServer found infsvcs %v", foundInferenceService)
-
-	if !foundInferenceService && m.Kis == nil {
+	if m.InferenceService == nil && m.Kis == nil {
 		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
 		if m.Kis == nil {
 			return nil
@@ -293,14 +278,20 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 	}
 
 	mas := []openapi.ModelArtifact{}
+	foundInferenceService := false
 	for mvidx, mv := range m.ModelVersions {
-		klog.V(4).Infof("kfmr:GetModelServer m.Kis != nil %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v",
-			m.Kis != nil, mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == kfmrIS.GetModelVersionId(), mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == kfmrIS.GetModelVersionId())
+		if m.InferenceService != nil {
+			klog.V(4).Infof("kfmr:GetModelServer m.Kis != nil %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.GetId() == kfmrIS.GetModelVersionId() %v",
+				m.Kis != nil, mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == m.InferenceService.GetModelVersionId(), mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.GetId() == m.InferenceService.GetModelVersionId())
+		} else {
+			klog.V(4).Infof("kfmr:GetModelServer m.Kis != nil %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v mv.RegisteredModelId == m.RegisteredModel.GetId() %v",
+				m.Kis != nil, mv.RegisteredModelId == m.RegisteredModel.GetId(), mv.RegisteredModelId == m.RegisteredModel.GetId())
+		}
 		switch {
 		// in case kubeflow/kserve reconciliation is not working
 		case m.Kis != nil && util.KServeInferenceServiceMapping(m.RegisteredModel.GetId(), mv.GetId(), m.Kis):
 			fallthrough
-		case mv.RegisteredModelId == m.RegisteredModel.GetId() && mv.GetId() == kfmrIS.GetModelVersionId():
+		case mv.RegisteredModelId == m.RegisteredModel.GetId() && m.InferenceService != nil && mv.GetId() == m.InferenceService.GetModelVersionId():
 			foundInferenceService = true
 			mvIndex = mvidx
 			mas = m.ModelArtifacts[mv.GetId()]
@@ -323,7 +314,6 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		}
 	}
 
-	m.MSPop.InfSvcIndex = infSvcIdx
 	m.MSPop.MVIndex = mvIndex
 	m.MSPop.MAIndex = maIndex
 
@@ -486,7 +476,6 @@ func (m *ModelPopulator) GetTechDocs() *string {
 type ModelServerPopulator struct {
 	CommonSchemaPopulator
 	ApiPop      ModelServerAPIPopulator
-	InfSvcIndex int
 	MVIndex     int
 	MAIndex     int
 }
@@ -538,8 +527,8 @@ func (m *ModelServerPopulator) GetAuthentication() *bool {
 // GetName returns the inference server name, sanitized to meet the following criteria
 // "a string that is sequences of [a-zA-Z0-9] separated by any of [-_.], at most 63 characters in total"
 func (m *ModelServerPopulator) GetName() string {
-	if len(m.InferenceServices) > m.InfSvcIndex {
-		sanitizedName := util.SanitizeName(m.InferenceServices[m.InfSvcIndex].GetName())
+	if m.InferenceService != nil {
+		sanitizedName := util.SanitizeName(m.InferenceService.GetName())
 		return sanitizedName
 	}
 	// if kubeflow/kserve reconciliation is not working, let's use the kserve inference service name
@@ -746,7 +735,7 @@ func (m *ModelServerAPIPopulator) GetURL() string {
 
 // catalog-info.yaml populators
 
-func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *openapi.RegisteredModel, mvs []openapi.ModelVersion, mas map[string][]openapi.ModelArtifact, isl []openapi.InferenceService, is *serverv1beta1.InferenceService, kfmr *KubeFlowRESTClientWrapper, client client.Client, writer io.Writer, format brdgtypes.NormalizerFormat) error {
+func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *openapi.RegisteredModel, mvs []openapi.ModelVersion, mas map[string][]openapi.ModelArtifact, isl *openapi.InferenceService, is *serverv1beta1.InferenceService, kfmr *KubeFlowRESTClientWrapper, client client.Client, writer io.Writer, format brdgtypes.NormalizerFormat) error {
 	compPop := ComponentPopulator{}
 	compPop.Owner = owner
 	compPop.Lifecycle = lifecycle
@@ -754,7 +743,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 	compPop.RegisteredModel = rm
 	compPop.ModelVersions = mvs
 	compPop.ModelArtifacts = mas
-	compPop.InferenceServices = isl
+	compPop.InferenceService = isl
 	compPop.Kis = is
 	compPop.CtrlClient = client
 	compPop.Ctx = ctx
@@ -801,7 +790,7 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 		apiPop.Kfmr = kfmr
 		apiPop.RegisteredModel = rm
 		apiPop.ModelVersions = mvs
-		apiPop.InferenceServices = isl
+		apiPop.InferenceService = isl
 		apiPop.Kis = is
 		apiPop.CtrlClient = client
 		apiPop.Ctx = ctx
@@ -813,15 +802,15 @@ func CallBackstagePrinters(ctx context.Context, owner, lifecycle string, rm *ope
 }
 
 type CommonPopulator struct {
-	Owner             string
-	Lifecycle         string
-	RegisteredModel   *openapi.RegisteredModel
-	ModelVersions     []openapi.ModelVersion
-	InferenceServices []openapi.InferenceService
-	Kfmr              *KubeFlowRESTClientWrapper
-	Kis               *serverv1beta1.InferenceService
-	CtrlClient        client.Client
-	Ctx               context.Context
+	Owner            string
+	Lifecycle        string
+	RegisteredModel  *openapi.RegisteredModel
+	ModelVersions    []openapi.ModelVersion
+	InferenceService *openapi.InferenceService
+	Kfmr             *KubeFlowRESTClientWrapper
+	Kis              *serverv1beta1.InferenceService
+	CtrlClient       client.Client
+	Ctx              context.Context
 }
 
 func (pop *CommonPopulator) GetOwner() string {
@@ -914,7 +903,7 @@ func (pop *CommonPopulator) GetLinksFromInferenceServices() []backstage.EntityLi
 	links := []backstage.EntityLink{}
 	// if for some reason kserve/kubeflow reconciliation is not working and there are no kubeflow inference services,
 	// let's match up based on registered model / model version name
-	if len(pop.InferenceServices) == 0 {
+	if pop.InferenceService == nil {
 		if pop.Kis != nil {
 			kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
 			links = append(links, kpop.GetLinks()...)
@@ -926,53 +915,49 @@ func (pop *CommonPopulator) GetLinksFromInferenceServices() []backstage.EntityLi
 			links = append(links, kpop.GetLinks()...)
 			return links
 		}
+		return []backstage.EntityLink{}
 	}
 
-	for _, is := range pop.InferenceServices {
-		var rmid *string
-		var ok bool
-		rmid, ok = pop.RegisteredModel.GetIdOk()
-		if !ok {
-			continue
+	rmid := pop.RegisteredModel.GetId()
+	if pop.InferenceService.RegisteredModelId != rmid {
+		return []backstage.EntityLink{}
+	}
+	var iss *openapi.InferenceServiceState
+	ok := false
+	iss, ok = pop.InferenceService.GetDesiredStateOk()
+	if !ok {
+		return []backstage.EntityLink{}
+	}
+	if *iss != openapi.INFERENCESERVICESTATE_DEPLOYED {
+		return []backstage.EntityLink{}
+	}
+	se, err := pop.Kfmr.GetServingEnvironment(pop.InferenceService.ServingEnvironmentId)
+	if err != nil {
+		klog.Errorf("ComponentPopulator GetLinks: %s", err.Error())
+		return []backstage.EntityLink{}
+	}
+	if pop.Kis == nil {
+		kisns := se.GetName()
+		kisnm := pop.InferenceService.GetRuntime()
+		var kis *serverv1beta1.InferenceService
+		if pop.Kfmr != nil && pop.Kfmr.Config != nil && pop.Kfmr.Config.ServingClient != nil {
+			kis, err = pop.Kfmr.Config.ServingClient.InferenceServices(kisns).Get(context.Background(), kisnm, metav1.GetOptions{})
 		}
-		if is.RegisteredModelId != *rmid {
-			continue
+		if kis == nil && pop.CtrlClient != nil {
+			kis = &serverv1beta1.InferenceService{}
+			err = pop.CtrlClient.Get(context.Background(), types.NamespacedName{Namespace: kisns, Name: kisnm}, kis)
 		}
-		var iss *openapi.InferenceServiceState
-		iss, ok = is.GetDesiredStateOk()
-		if !ok {
-			continue
-		}
-		if *iss != openapi.INFERENCESERVICESTATE_DEPLOYED {
-			continue
-		}
-		se, err := pop.Kfmr.GetServingEnvironment(is.ServingEnvironmentId)
+
 		if err != nil {
 			klog.Errorf("ComponentPopulator GetLinks: %s", err.Error())
-			continue
+			return []backstage.EntityLink{}
 		}
-		if pop.Kis == nil {
-			kisns := se.GetName()
-			kisnm := is.GetRuntime()
-			var kis *serverv1beta1.InferenceService
-			if pop.Kfmr != nil && pop.Kfmr.Config != nil && pop.Kfmr.Config.ServingClient != nil {
-				kis, err = pop.Kfmr.Config.ServingClient.InferenceServices(kisns).Get(context.Background(), kisnm, metav1.GetOptions{})
-			}
-			if kis == nil && pop.CtrlClient != nil {
-				kis = &serverv1beta1.InferenceService{}
-				err = pop.CtrlClient.Get(context.Background(), types.NamespacedName{Namespace: kisns, Name: kisnm}, kis)
-			}
 
-			if err != nil {
-				klog.Errorf("ComponentPopulator GetLinks: %s", err.Error())
-				continue
-			}
-
-			pop.Kis = kis
-		}
-		kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
-		links = append(links, kpop.GetLinks()...)
+		pop.Kis = kis
 	}
+	kpop := kserve.CommonPopulator{InferSvc: pop.Kis}
+	links = append(links, kpop.GetLinks()...)
+
 	return links
 }
 
