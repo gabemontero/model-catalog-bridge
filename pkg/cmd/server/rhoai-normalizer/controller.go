@@ -493,8 +493,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.defaultLifecycle,
 							&rm,
 							//TODO deal with multiple versions
-							[]openapi.ModelVersion{mv},
-							map[string][]openapi.ModelArtifact{mv.GetId(): mas},
+							&mv,
+							mas,
 							nil,
 							is,
 							kfmr,
@@ -580,8 +580,8 @@ func (r *RHOAINormalizerReconcile) processKFMR(ctx context.Context, name types.N
 							r.defaultOwner,
 							r.defaultLifecycle,
 							&rm,
-							[]openapi.ModelVersion{*mv},
-							map[string][]openapi.ModelArtifact{mvId: mas},
+							mv,
+							mas,
 							&kfmrIS,
 							is,
 							kfmr,
@@ -654,7 +654,6 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 		var rms []openapi.RegisteredModel
 		var mvs map[string][]openapi.ModelVersion
 		var mas map[string]map[string][]openapi.ModelArtifact
-		var isl []openapi.InferenceService
 
 		rms, mvs, mas, err = kubeflowmodelregistry.LoopOverKFMR([]string{}, kfmr)
 		if err != nil {
@@ -690,19 +689,13 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					ebuf = buf
 					ewriter = bwriter
 				}
-				isl, err = kfmr.ListInferenceServices()
+
+				mvISL := []openapi.InferenceService{}
+				mvISL, err = kubeflowmodelregistry.GetKubeFlowInferenceServicesForModelVersion(kfmr, &mv)
 				if err != nil {
 					controllerLog.Error(err, "error listing kubeflow inference services")
 					continue
 				}
-				// only include inference services that correspond to this model version
-				mvISL := []openapi.InferenceService{}
-				for _, is := range isl {
-					if is.GetModelVersionId() == mv.GetId() && is.ModelVersionId != nil {
-						mvISL = append(mvISL, is)
-					}
-				}
-				klog.V(4).Infof("innerStart total num kubeflow infsvc %d num matched to model version %d", len(isl), len(mvISL))
 				if len(mvISL) == 0 {
 					err = r.innerStartCallBackstagePrinters(ctx,
 						kfmr,
@@ -710,7 +703,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						&mv,
 						nil,
 						nil,
-						maa,
+						maa[mv.Name],
 						replacer,
 						ewriter,
 						ebuf,
@@ -748,7 +741,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						&mv,
 						&kis,
 						kserveIS,
-						maa,
+						maa[mv.GetId()],
 						replacer,
 						ewriter,
 						ebuf,
@@ -811,14 +804,14 @@ func (r *RHOAINormalizerReconcile) innerStartCallBackstagePrinters(ctx context.C
 	mv *openapi.ModelVersion,
 	isl *openapi.InferenceService,
 	is *serverapiv1beta1.InferenceService,
-	maa map[string][]openapi.ModelArtifact,
+	maa []openapi.ModelArtifact,
 	replacer *strings.Replacer,
 	ewriter *bufio.Writer,
 	ebuf *bytes.Buffer,
 	importKey string,
 	lastUpdateTimeSinceEpoch string) error {
 	// only include this model version vs. whole array to line up with our importKey
-	err := kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, rm, []openapi.ModelVersion{*mv}, maa, isl, is, kfmr, r.client, ewriter, r.format)
+	err := kubeflowmodelregistry.CallBackstagePrinters(ctx, r.defaultOwner, r.defaultLifecycle, rm, mv, maa, isl, is, kfmr, r.client, ewriter, r.format)
 	if err != nil {
 		controllerLog.Error(err, "error processing calling backstage printer")
 		return err
@@ -827,16 +820,15 @@ func (r *RHOAINormalizerReconcile) innerStartCallBackstagePrinters(ctx context.C
 	modelCardKey := ""
 	if len(kfmr.RootCatalogURL) > 0 {
 		for _, ma := range maa {
-			if len(ma) > 0 {
-				m := ma[0]
-				modelCard, err = kfmr.GetModelCard(m.GetModelSourceClass(), m.GetModelSourceGroup(), m.GetModelSourceName())
-				if err != nil {
-					controllerLog.Error(err, "error getting model card")
-				} else {
-					modelCardKey = replacer.Replace(m.GetModelSourceClass()) + replacer.Replace(m.GetModelSourceGroup()) + replacer.Replace(m.GetModelSourceName())
-					klog.V(4).Infof("innerStart built modelCardKey %s", modelCardKey)
-				}
+			modelCard, err = kfmr.GetModelCard(ma.GetModelSourceClass(), ma.GetModelSourceGroup(), ma.GetModelSourceName())
+			if err != nil {
+				controllerLog.Error(err, "error getting model card")
+				continue
 			}
+			modelCardKey = replacer.Replace(ma.GetModelSourceClass()) + replacer.Replace(ma.GetModelSourceGroup()) + replacer.Replace(ma.GetModelSourceName())
+			klog.V(4).Infof("innerStart built modelCardKey %s", modelCardKey)
+			break
+
 		}
 	}
 	err = r.processBWriter(ewriter, ebuf, importKey, types2.KubeflowNormalizer, lastUpdateTimeSinceEpoch, modelCardKey, modelCard)
