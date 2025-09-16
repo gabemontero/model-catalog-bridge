@@ -423,6 +423,12 @@ func (r *RHOAINormalizerReconcile) processBWriter(bwriter *bufio.Writer, buf *by
 
 	httpRC := 0
 	msg := ""
+	mcardLen := 0
+	if modelCard != nil {
+		mcardLen = len(*modelCard)
+	}
+	klog.V(4).Infof("processBWriater key %s type %s epoch %s mkey %s len mcard %v len buf %d",
+		importKey, reconcilerType, lastUpdateTimeSinceEpoch, modelCardKey, mcardLen, buf.Len())
 	httpRC, msg, _, err = r.storage.UpsertModel(importKey, reconcilerType, lastUpdateTimeSinceEpoch, modelCardKey, modelCard, buf.Bytes())
 	if err != nil {
 		return err
@@ -714,6 +720,15 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 					}
 				}
 				for _, kis := range mvISL {
+					kiss, ok := kis.GetDesiredStateOk()
+					if !ok || kiss == nil {
+						klog.V(4).Infof("innerStart kubeflow infsvc %s id %s does not have desired state", kis.GetName(), kis.GetId())
+						continue
+					}
+					if *kiss != openapi.INFERENCESERVICESTATE_DEPLOYED {
+						klog.V(4).Infof("innerStart kubeflow infsvc %s id %s not deployed", kis.GetName(), kis.GetId())
+						continue
+					}
 					var kserveIS *serverapiv1beta1.InferenceService
 					isList := serverapiv1beta1.InferenceServiceList{}
 					selector := labels.SelectorFromSet(map[string]string{
@@ -748,8 +763,10 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						importKey,
 						lastUpdateTimeSinceEpoch)
 					if err != nil {
-						continue
+						klog.Errorf("innerStart error from call backstage printers %s", err.Error())
 					}
+					// break regardless since only one kubeflow infsvc can match to kserve infsvc
+					break
 				}
 			}
 		}
