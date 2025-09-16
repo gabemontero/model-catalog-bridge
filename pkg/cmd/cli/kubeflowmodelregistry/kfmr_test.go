@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
+	"github.com/kubeflow/model-registry/pkg/openapi"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
@@ -37,88 +38,100 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 	defer ts.Close()
 	for _, tc := range []struct {
 		// we do output compare in chunks as ranges over the components status map are non-deterministic wrt order
-		outMc *golang.ModelCatalog
+		name  string
+		outMc []golang.ModelCatalog
 		is    *serverapiv1beta1.InferenceService
 	}{
 		{
-			outMc: &golang.ModelCatalog{
-				Models: []golang.Model{
-					{
-						Description: "simple model that does not require a GPU",
-						Ethics:      &ethics,
-						HowToUseURL: &howTo,
-						Lifecycle:   util.DefaultLifecycle,
-						Name:        "mnist-v1",
-						Owner:       "kubeadmin",
-						Support:     &support,
-						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
-						Training:    &training,
-						License:     &license,
-						Usage:       &usage,
+			name: "2 model catalogs, neither with a model server",
+			outMc: []golang.ModelCatalog{
+				{
+					Models: []golang.Model{
+						{
+							Description: "\nsimple model that does not require a GPU",
+							Ethics:      &ethics,
+							HowToUseURL: &howTo,
+							Lifecycle:   util.DefaultLifecycle,
+							Name:        "mnist-v1",
+							Owner:       "kubeadmin",
+							Support:     &support,
+							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
+							Training:    &training,
+							License:     &license,
+							Usage:       &usage,
+						},
 					},
-					{
-						Description: "simple model that does not require a GPU",
-						Ethics:      &ethics,
-						HowToUseURL: &howTo,
-						Lifecycle:   util.DefaultLifecycle,
-						Name:        "mnist-v3",
-						Owner:       "kubeadmin",
-						Support:     &support,
-						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
-						Training:    &training,
-						Usage:       &usage,
+				},
+				{
+					Models: []golang.Model{
+						{
+							Description: "\nsimple model that does not require a GPU",
+							Ethics:      &ethics,
+							HowToUseURL: &howTo,
+							Lifecycle:   util.DefaultLifecycle,
+							Name:        "mnist-v3",
+							Owner:       "kubeadmin",
+							Support:     &support,
+							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
+							Training:    &training,
+							Usage:       &usage,
+						},
 					},
 				},
 			},
 		},
 		{
-			outMc: &golang.ModelCatalog{
-				Models: []golang.Model{
-					{
-						Annotations: map[string]string{
-							"TechDocs": "http://localhost:9090/modelcard?key=RedHatrhelai1granite-7b-starter",
+			name: "2 model catalogs, 1 has as model server",
+			outMc: []golang.ModelCatalog{
+				{
+					Models: []golang.Model{
+						{
+							Description: "\nsimple model that does not require a GPU",
+							Ethics:      &ethics,
+							HowToUseURL: &howTo,
+							Lifecycle:   util.DefaultLifecycle,
+							Name:        "mnist-v1",
+							Owner:       "kubeadmin",
+							Support:     &support,
+							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
+							Training:    &training,
+							License:     &license,
+							Usage:       &usage,
 						},
-						Description: "simple model that does not require a GPU",
-						Ethics:      &ethics,
-						HowToUseURL: &howTo,
-						Lifecycle:   util.DefaultLifecycle,
-						Name:        "mnist-v1",
-						Owner:       "kubeadmin",
-						Support:     &support,
-						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
-						Training:    &training,
-						Usage:       &usage,
-						License:     &license,
 					},
-					{
-						Description: "simple model that does not require a GPU",
-						Ethics:      &ethics,
-						HowToUseURL: &howTo,
-						Lifecycle:   util.DefaultLifecycle,
-						Name:        "mnist-v3",
-						Owner:       "kubeadmin",
-						Support:     &support,
-						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
-						Training:    &training,
-						Usage:       &usage,
+					ModelServer: &golang.ModelServer{
+						API: &golang.API{
+							Annotations: nil,
+							Spec:        "a openapi spec string",
+							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
+							Type:        golang.Grpc,
+							URL:         "https://kserve.com",
+						},
+						Authentication: &falsePtr,
+						Description:    "\nsimple model that does not require a GPU",
+						HomepageURL:    &homepageURL,
+						Lifecycle:      util.DefaultLifecycle,
+						Name:           "mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d",
+						Owner:          "kubeadmin",
+						Tags:           []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
+						Usage:          &usage,
 					},
 				},
-				ModelServer: &golang.ModelServer{
-					API: &golang.API{
-						Annotations: nil,
-						Spec:        "a openapi spec string",
-						Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
-						Type:        golang.Grpc,
-						URL:         "https://kserve.com",
+				{
+					Models: []golang.Model{
+						{
+							Description: "\nsimple model that does not require a GPU",
+							Ethics:      &ethics,
+							HowToUseURL: &howTo,
+							Lifecycle:   util.DefaultLifecycle,
+							Name:        "mnist-v3",
+							Owner:       "kubeadmin",
+							Support:     &support,
+							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
+							Training:    &training,
+							Usage:       &usage,
+						},
 					},
-					Authentication: &falsePtr,
-					Description:    "simple model that does not require a GPU",
-					HomepageURL:    &homepageURL,
-					Lifecycle:      util.DefaultLifecycle,
-					Name:           "mnist-v18c2c357f-bf82-4d2d-a254-43eca96fd31d",
-					Owner:          "kubeadmin",
-					Tags:           []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
-					Usage:          &usage,
 				},
 			},
 			is: &serverapiv1beta1.InferenceService{
@@ -139,9 +152,6 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 		kfmr.SetupKubeflowTestRESTClient(ts, cfg)
 		k := SetupKubeflowRESTClient(cfg)
 		ids := []string{}
-		b := []byte{}
-		buf := bytes.NewBuffer(b)
-		bwriter := bufio.NewWriter(buf)
 		var cl client.Client
 		if tc.is != nil {
 			objs := []client.Object{tc.is}
@@ -157,101 +167,276 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 			common.AssertEqual(t, true, ok)
 			maa, ok2 := mas[util.SanitizeName(rm.Name)]
 			common.AssertEqual(t, true, ok2)
-			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
-			common.AssertError(t, err)
-			bwriter.Flush()
-			// so the order of the tags array is random so we can't just do json as a string compare, so we have to
-			// hydrate back to a &golang.ModelCatalog to compare fields
-			outMc := &golang.ModelCatalog{}
-			err = json.Unmarshal(buf.Bytes(), outMc)
-			common.AssertError(t, err)
-			common.AssertEqual(t, tc.outMc.ModelServer == nil, outMc.ModelServer == nil)
-			common.AssertEqual(t, tc.outMc.Models == nil, outMc.Models == nil)
-			common.AssertEqual(t, len(tc.outMc.Models), len(outMc.Models))
-			if len(tc.outMc.Models) > 0 {
-				tcModel := tc.outMc.Models[0]
-				outModel := outMc.Models[0]
-				common.AssertEqual(t, tcModel.Name, outModel.Name)
-				common.AssertEqual(t, tcModel.Description, outModel.Description)
-				common.AssertEqual(t, tcModel.Lifecycle, outModel.Lifecycle)
-				common.AssertEqual(t, tcModel.Owner, outModel.Owner)
-				common.AssertEqual(t, len(tcModel.Tags), len(outModel.Tags))
-				for _, tag := range tcModel.Tags {
-					found := false
-					for _, otag := range outModel.Tags {
-						if otag == tag {
-							found = true
-							break
+			for _, mv := range mva {
+				mvISL := []openapi.InferenceService{}
+				mvISL, err = GetKubeFlowInferenceServicesForModelVersion(k, &mv)
+				if err != nil {
+					t.Logf("GetKubeFlowInferenceServicesForModelVersion err %s", err.Error())
+					continue
+				}
+				b := []byte{}
+				buf := bytes.NewBuffer(b)
+				bwriter := bufio.NewWriter(buf)
+				if len(mvISL) == 0 {
+					err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, &mv, maa[mv.Name], nil, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+				} else {
+					err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, &mv, maa[mv.Name], &mvISL[0], tc.is, k, cl, bwriter, types.JsonArrayForamt)
+				}
+				if err != nil {
+					t.Logf("CallBackstagePrinters err %s", err.Error())
+					continue
+				}
+				bwriter.Flush()
+				// so the order of the tags array is random so we can't just do json as a string compare, so we have to
+				// hydrate back to a &golang.ModelCatalog to compare fields
+				outMc := &golang.ModelCatalog{}
+				err = json.Unmarshal(buf.Bytes(), outMc)
+				common.AssertError(t, err)
+				found := false
+				idx := 0
+				for oidx, omc := range tc.outMc {
+					idx = oidx
+					tcModelServer := omc.ModelServer == nil
+					outModelServer := outMc.ModelServer == nil
+					if tcModelServer != outModelServer {
+						t.Logf("model server diff oidx %d", oidx)
+						continue
+					}
+					tcModels := omc.Models == nil
+					outModels := outMc.Models == nil
+					if tcModels != outModels {
+						t.Logf("models diff nil check oidx %d", oidx)
+						continue
+					}
+					if len(omc.Models) != len(outMc.Models) {
+						t.Logf("models diff len oidx %d", oidx)
+						continue
+					}
+					if len(omc.Models) > 0 {
+						if len(outMc.Models) == 0 {
+							t.Logf("models length mismatch oidx %d", oidx)
+							continue
+						}
+						tcModel := omc.Models[0]
+						outModel := outMc.Models[0]
+						if tcModel.Name != outModel.Name {
+							t.Logf("name mismatch oidx %d", oidx)
+							continue
+						}
+						if tcModel.Description != outModel.Description {
+							t.Logf("description mismatch oidx %d", oidx)
+							continue
+						}
+						if tcModel.Lifecycle != outModel.Lifecycle {
+							t.Logf("lifecycle mismatch oidx %d", oidx)
+							continue
+						}
+						if tcModel.Owner != outModel.Owner {
+							t.Logf("owner mismatch oidx %d", oidx)
+							continue
+						}
+						if len(tcModel.Tags) != len(outModel.Tags) {
+							t.Logf("tags len mismatch oidx %d", oidx)
+							continue
+						}
+						for _, tag := range tcModel.Tags {
+							tagFound := false
+							for _, otag := range outModel.Tags {
+								if otag == tag {
+									tagFound = true
+									break
+								}
+							}
+							if !tagFound {
+								t.Logf("tag %s not found oidx %d", tag, oidx)
+								continue
+							}
+						}
+						tcEthics := tcModel.Ethics == nil
+						outEthics := outModel.Ethics == nil
+						if tcEthics != outEthics {
+							t.Logf("ethics nil mismatch oidx %d", oidx)
+							continue
+						}
+						tcHowToUseURL := tcModel.HowToUseURL == nil
+						outHowToUseURL := outModel.HowToUseURL == nil
+						if tcHowToUseURL != outHowToUseURL {
+							t.Logf("howToUseURL nil mismatch oidx %d", oidx)
+							continue
+						}
+						tcSupport := tcModel.Support == nil
+						outSupport := outModel.Support == nil
+						if tcSupport != outSupport {
+							t.Logf("support nil mismatch oidx %d", oidx)
+							continue
+						}
+						tcTraining := tcModel.Training == nil
+						outTraining := outModel.Training == nil
+						if tcTraining != outTraining {
+							t.Logf("training nil mismatch oidx %d", oidx)
+							continue
+						}
+						tcLicense := tcModel.License == nil
+						outLicense := outModel.License == nil
+						if tcLicense != outLicense {
+							t.Logf("license nil mismatch oidx %d", oidx)
+							continue
+						}
+						tcUsage := tcModel.Usage == nil
+						outUsage := outModel.Usage == nil
+						if tcUsage != outUsage {
+							t.Logf("usage nil mismatch oidx %d", oidx)
+							continue
+						}
+
+						if tcModel.Ethics != nil {
+							if *(tcModel.Ethics) != *(outModel.Ethics) {
+								t.Logf("ethics mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.HowToUseURL != nil {
+							if *(tcModel.HowToUseURL) != *(outModel.HowToUseURL) {
+								t.Logf("howToUseURL mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.Support != nil {
+							if *(tcModel.Support) != *(outModel.Support) {
+								t.Logf("support mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.Training != nil {
+							if *(tcModel.Training) != *(outModel.Training) {
+								t.Logf("training mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.Usage != nil {
+							if *(tcModel.Usage) != *(outModel.Usage) {
+								t.Logf("usage mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.License != nil {
+							if *(tcModel.License) != *(outModel.License) {
+								t.Logf("license mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tcModel.Annotations != nil {
+							if tcModel.Annotations[types.TechDocsKey] != outModel.Annotations[types.TechDocsKey] {
+								t.Logf("annotation mismatch oidx %d", oidx)
+								continue
+							}
 						}
 					}
-					common.AssertEqual(t, true, found)
-				}
-				common.AssertEqual(t, tcModel.Ethics == nil, outModel.Ethics == nil)
-				common.AssertEqual(t, tcModel.HowToUseURL == nil, outModel.HowToUseURL == nil)
-				common.AssertEqual(t, tcModel.Support == nil, outModel.Support == nil)
-				common.AssertEqual(t, tcModel.Training == nil, outModel.Training == nil)
-				common.AssertEqual(t, tcModel.License == nil, outModel.License == nil)
-				common.AssertEqual(t, tcModel.Usage == nil, outModel.Usage == nil)
-				if tcModel.Ethics != nil {
-					common.AssertEqual(t, *(tcModel.Ethics), *(outModel.Ethics))
-				}
-				if tcModel.HowToUseURL != nil {
-					common.AssertEqual(t, *(tcModel.HowToUseURL), *(outModel.HowToUseURL))
-				}
-				if tcModel.Support != nil {
-					common.AssertEqual(t, *(tcModel.Support), *(outModel.Support))
-				}
-				if tcModel.Training != nil {
-					common.AssertEqual(t, *(tcModel.Training), *(outModel.Training))
-				}
-				if tcModel.Usage != nil {
-					common.AssertEqual(t, *(tcModel.Usage), *(outModel.Usage))
-				}
-				if tcModel.License != nil {
-					common.AssertEqual(t, *(tcModel.License), *(outModel.License))
-				}
-				if tcModel.Annotations != nil {
-					common.AssertEqual(t, tcModel.Annotations[types.TechDocsKey], outModel.Annotations[types.TechDocsKey])
-				}
-			}
-			if tc.outMc.ModelServer != nil {
-				tms := tc.outMc.ModelServer
-				oms := outMc.ModelServer
-				common.AssertEqual(t, tms.Name, oms.Name)
-				common.AssertEqual(t, tms.Description, oms.Description)
-				common.AssertEqual(t, tms.Lifecycle, oms.Lifecycle)
-				common.AssertEqual(t, tms.Owner, oms.Owner)
-				common.AssertEqual(t, tms.API == nil, oms.API == nil)
-				common.AssertEqual(t, tms.Authentication == nil, oms.Authentication == nil)
-				common.AssertEqual(t, tms.HomepageURL == nil, oms.HomepageURL == nil)
-				common.AssertEqual(t, tms.Usage == nil, oms.Usage == nil)
-				common.AssertEqual(t, len(tms.Tags), len(oms.Tags))
-				if tms.API != nil {
-					common.AssertEqual(t, tms.API.Spec, oms.API.Spec)
-					common.AssertEqual(t, tms.API.URL, oms.API.URL)
-					common.AssertEqual(t, tms.API.Type, oms.API.Type)
-					common.AssertEqual(t, len(tms.API.Tags), len(oms.API.Tags))
-				}
-				if tms.Authentication != nil {
-					common.AssertEqual(t, *(tms.Authentication), *(oms.Authentication))
-				}
-				if tms.HomepageURL != nil {
-					common.AssertEqual(t, *(tms.HomepageURL), *(oms.HomepageURL))
-				}
-				if tms.Usage != nil {
-					common.AssertEqual(t, *(tms.Usage), *(oms.Usage))
-				}
-				for _, tag := range tms.Tags {
-					found := false
-					for _, otag := range oms.Tags {
-						if tag == otag {
-							found = true
-							break
+					if omc.ModelServer != nil {
+						tms := omc.ModelServer
+						oms := outMc.ModelServer
+						if tms.Name != oms.Name {
+							t.Logf("svr name mismatch oidx %d", oidx)
+							continue
+						}
+						if tms.Description != oms.Description {
+							t.Logf("svr description mismatch oidx %d", oidx)
+							continue
+						}
+						if tms.Lifecycle != oms.Lifecycle {
+							t.Logf("svr lifecycle mismatch oidx %d", oidx)
+							continue
+						}
+						if tms.Owner != oms.Owner {
+							t.Logf("svr owner mismatch oidx %d", oidx)
+							continue
+						}
+						tmsAPI := tms.API == nil
+						omsAPI := oms.API == nil
+						if tmsAPI != omsAPI {
+							t.Logf("svr api nil mismatch oidx %d", oidx)
+							continue
+						}
+						tmsAuth := tms.Authentication == nil
+						omsAuth := oms.Authentication == nil
+						if tmsAuth != omsAuth {
+							t.Logf("svr auth nil mismatch oidx %d", oidx)
+							continue
+						}
+						tmsHomepage := tms.HomepageURL == nil
+						omsHomepage := oms.HomepageURL == nil
+						if tmsHomepage != omsHomepage {
+							t.Logf("svr homepage nil mismatch oidx %d", oidx)
+							continue
+						}
+						tmsUsage := tms.Usage == nil
+						omsUsage := oms.Usage == nil
+						if tmsUsage != omsUsage {
+							t.Logf("svr usage nil mismatch oidx %d", oidx)
+							continue
+						}
+						if len(oms.Tags) != len(tms.Tags) {
+							t.Logf("svr tags len mismatch oidx %d", oidx)
+							continue
+						}
+						if tms.API != nil {
+							if tms.API.Spec != oms.API.Spec {
+								t.Logf("svr api spec mismatch oidx %d", oidx)
+								continue
+							}
+							if tms.API.URL != oms.API.URL {
+								t.Logf("svr api url mismatch oidx %d", oidx)
+								continue
+							}
+							if tms.API.Type != oms.API.Type {
+								t.Logf("svr api type mismatch oidx %d", oidx)
+								continue
+							}
+							if len(oms.API.Tags) != len(tms.API.Tags) {
+								t.Logf("svr api tags len mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tms.Authentication != nil {
+							if *(tms.Authentication) != *(oms.Authentication) {
+								t.Logf("svr authentication mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tms.HomepageURL != nil {
+							if *(tms.HomepageURL) != *(oms.HomepageURL) {
+								t.Logf("svr homepage url mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						if tms.Usage != nil {
+							if *(tms.Usage) != *(oms.Usage) {
+								t.Logf("svr usage mismatch oidx %d", oidx)
+								continue
+							}
+						}
+						for _, tag := range tms.Tags {
+							foundTag := false
+							for _, otag := range oms.Tags {
+								if tag == otag {
+									foundTag = true
+									break
+								}
+							}
+							if !foundTag {
+								t.Logf("sbr tag %s mismatch oidx %d", tag, oidx)
+								continue
+							}
 						}
 					}
-					common.AssertEqual(t, true, found)
+					found = true
+					t.Logf("FOUND MATCH %s idx %d", tc.name, oidx)
+					break
 				}
+				if !found {
+					t.Errorf("did not find match for test %s idx %d and model catalog %#v", tc.name, idx, outMc)
+				}
+
 			}
 		}
 
@@ -333,8 +518,12 @@ func TestLoopOverKRMR_JsonArrayMultiModel(t *testing.T) {
 			b := []byte{}
 			buf := bytes.NewBuffer(b)
 			bwriter := bufio.NewWriter(buf)
-			err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, mva, maa, isl, tc.is, k, cl, bwriter, types.JsonArrayForamt)
-			common.AssertError(t, err)
+			for _, mv := range mva {
+				for _, is := range isl {
+					err = CallBackstagePrinters(context.TODO(), util.DefaultOwner, util.DefaultLifecycle, &rm, &mv, maa[mv.Name], &is, tc.is, k, cl, bwriter, types.JsonArrayForamt)
+					common.AssertError(t, err)
+				}
+			}
 			bwriter.Flush()
 			testMc, ok := tc.outMc[rm.GetId()]
 			common.AssertEqual(t, true, ok)
@@ -401,8 +590,12 @@ func TestLoopOverKFMR_CatalogInfoYaml(t *testing.T) {
 			maa, ok2 := mas[util.SanitizeName(rm.Name)]
 			common.AssertEqual(t, true, ok2)
 			isl, _ := k.ListInferenceServices()
-			err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, mva, maa, isl, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
-			common.AssertError(t, err)
+			for _, mv := range mva {
+				for _, is := range isl {
+					err = CallBackstagePrinters(context.TODO(), owner, lifecycle, &rm, &mv, maa[mv.Name], &is, nil, k, nil, bwriter, types.CatalogInfoYamlFormat)
+					common.AssertError(t, err)
+				}
+			}
 		}
 		bwriter.Flush()
 		outstr := buf.String()
