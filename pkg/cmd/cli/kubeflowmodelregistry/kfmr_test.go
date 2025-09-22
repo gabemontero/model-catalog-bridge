@@ -9,6 +9,7 @@ import (
 
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	"github.com/kubeflow/model-registry/pkg/openapi"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
@@ -101,7 +102,7 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 					},
 					ModelServer: &golang.ModelServer{
 						API: &golang.API{
-							Annotations: nil,
+							Annotations: map[string]string{backstage.EXTERNAL_ROUTE_URL: "https://kserve.com"},
 							Spec:        "a openapi spec string",
 							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v1", "last-modified-time-2025-02-25-19-45-29-959", "grpc"},
 							Type:        golang.Grpc,
@@ -380,6 +381,18 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 							continue
 						}
 						if tms.API != nil {
+							tmsAnnotations := tms.API.Annotations == nil
+							omsAnnotations := oms.API.Annotations == nil
+							if tmsAnnotations != omsAnnotations {
+								t.Logf("svr annotations mismatch oidx %d", oidx)
+								continue
+							}
+							if tms.API.Annotations != nil {
+                                 if len(tms.API.Annotations) != len(oms.API.Annotations) {
+                                      t.Logf("svr annotations len mismatch oidx %d", oidx)
+                                      continue
+                                 }
+							}
 							if tms.API.Spec != oms.API.Spec {
 								t.Logf("svr api spec mismatch oidx %d", oidx)
 								continue
