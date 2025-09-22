@@ -91,20 +91,20 @@ func LoopOverKFMR(ids []string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.Regi
 }
 
 func GetKubeFlowInferenceServicesForModelVersion(kfrm *KubeFlowRESTClientWrapper,
-     mv *openapi.ModelVersion) ([]openapi.InferenceService, error) {
-     isl, err := kfrm.ListInferenceServices()
-     if err != nil {
-          return nil, err
-     }
-     // only include inference services that correspond to this model version
-     mvISL := []openapi.InferenceService{}
-     for _, is := range isl {
-          if is.GetModelVersionId() == mv.GetId() && is.ModelVersionId != nil {
-               mvISL = append(mvISL, is)
-          }
-     }
-     klog.V(4).Infof("getKubeFlowInferenceServicesForModelVersion total num kubeflow infsvc %d num matched to model version %d", len(isl), len(mvISL))
-     return mvISL, nil
+	mv *openapi.ModelVersion) ([]openapi.InferenceService, error) {
+	isl, err := kfrm.ListInferenceServices()
+	if err != nil {
+		return nil, err
+	}
+	// only include inference services that correspond to this model version
+	mvISL := []openapi.InferenceService{}
+	for _, is := range isl {
+		if is.GetModelVersionId() == mv.GetId() && is.ModelVersionId != nil {
+			mvISL = append(mvISL, is)
+		}
+	}
+	klog.V(4).Infof("getKubeFlowInferenceServicesForModelVersion total num kubeflow infsvc %d num matched to model version %d", len(isl), len(mvISL))
+	return mvISL, nil
 }
 
 func callKubeflowREST(id string, kfmr *KubeFlowRESTClientWrapper) ([]openapi.ModelVersion, map[string][]openapi.ModelArtifact, error) {
@@ -535,11 +535,21 @@ func (m *ModelServerPopulator) GetAPI() *golang.API {
 	m.ApiPop.MVIndex = m.MVIndex
 	m.ApiPop.MAIndex = m.MAIndex
 	m.ApiPop.Ctx = m.Ctx
+	routeExternalURL, svcInternalURL := m.ApiPop.GetURL()
 	api := &golang.API{
 		Spec: m.ApiPop.GetSpec(),
 		Tags: m.ApiPop.GetTags(),
 		Type: m.ApiPop.GetType(),
-		URL:  m.ApiPop.GetURL(),
+		URL:  routeExternalURL,
+	}
+    api.Annotations = map[string]string{}
+    if len(svcInternalURL) > 0 {
+         api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
+    }
+	if routeExternalURL != svcInternalURL && len(routeExternalURL) > 0 {
+		// model exposed via route
+		api.Annotations[backstage.EXTERNAL_ROUTE_URL] = routeExternalURL
+
 	}
 	return api
 }
@@ -627,62 +637,66 @@ func (m *ModelServerAPIPopulator) GetType() golang.Type {
 	return golang.Openapi
 }
 
-func (m *ModelServerAPIPopulator) GetURL() string {
+func (m *ModelServerAPIPopulator) getFullSvcURL() string {
+	// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
+	// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
+	// the port correctly; so we will find the corresponding service and add the port
+	listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
+	svcList := &corev1.ServiceList{}
+	err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
+	if err != nil {
+		return ""
+	}
+	for _, svc := range svcList.Items {
+		if svc.OwnerReferences == nil {
+			continue
+		}
+		for _, o := range svc.OwnerReferences {
+			if o.Kind == "InferenceService" &&
+				o.Name == m.Kis.Name &&
+				strings.HasSuffix(svc.Name, "-predictor") {
+				// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
+				// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
+				// the port correctly
+				var port int32
+				port = 0
+				for _, sp := range svc.Spec.Ports {
+					port = sp.Port
+					if sp.TargetPort.Type == intstr.Int {
+						port = sp.TargetPort.IntVal
+					}
+					break
+				}
+				portStr := ""
+				if port != 0 && port != 80 {
+					portStr = fmt.Sprintf(":%d", port)
+				}
+				return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
+			}
+		}
+	}
+	return ""
+}
+
+func (m *ModelServerAPIPopulator) GetURL() (string, string) {
 	if m.Kis == nil {
 		m.Kis = m.GetInferenceServerByRegModelModelVersionName()
 		if m.Kis == nil {
-			return ""
+			return "", ""
 		}
 	}
 	if m.Kis.Status.URL != nil && m.Kis.Status.URL.URL() != nil {
-		// return the KServe InferenceService Route or Service URL
 		kisUrl := m.Kis.Status.URL.URL().String()
 		if strings.Contains(kisUrl, "svc.cluster.local") {
-			// only the service was exposed
-
-			// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-			// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-			// the port correctly; so we will find the corresponding service and add the port
-			listOptions := &client.ListOptions{Namespace: m.Kis.Namespace}
-			svcList := &corev1.ServiceList{}
-			err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
-			if err != nil {
-				return ""
-			}
-			for _, svc := range svcList.Items {
-				if svc.OwnerReferences == nil {
-					continue
-				}
-				for _, o := range svc.OwnerReferences {
-					if o.Kind == "InferenceService" &&
-						o.Name == m.Kis.Name &&
-						strings.HasSuffix(svc.Name, "-predictor") {
-						// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-						// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-						// the port correctly
-						var port int32
-						port = 0
-						for _, sp := range svc.Spec.Ports {
-							port = sp.Port
-							if sp.TargetPort.Type == intstr.Int {
-								port = sp.TargetPort.IntVal
-							}
-							break
-						}
-						portStr := ""
-						if port != 0 && port != 80 {
-							portStr = fmt.Sprintf(":%d", port)
-						}
-						return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
-					}
-				}
-			}
-
+			// only the service URL is exposed
+			svcURL := m.getFullSvcURL()
+			return svcURL, svcURL
 		}
-		return m.Kis.Status.URL.URL().String()
+		// return the KServe InferenceService Route and Service URL
+		return m.Kis.Status.URL.URL().String(), m.getFullSvcURL()
 	}
 
-	return ""
+	return "", ""
 }
 
 // catalog-info.yaml populators

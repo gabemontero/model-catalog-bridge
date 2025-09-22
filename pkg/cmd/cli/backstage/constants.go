@@ -16,4 +16,6 @@ const (
 	LINK_ICON_WEBASSET = "WebAsset"
 	TECHDOC_REFS       = "backstage.io/techdocs-ref"
 	VERSION            = "backstage.io/v1alpha1"
+    EXTERNAL_ROUTE_URL = "rhdh.modelcatalog.io/external-route-url"
+    INTERNAL_SVC_URL   = "rhdh.modelcatalog.io/internal-service-url"
 )
