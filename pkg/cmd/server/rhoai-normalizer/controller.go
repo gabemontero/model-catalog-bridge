@@ -678,6 +678,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 				klog.V(4).Infof("innerStarat mas rm disconnect %s", rm.Name)
 				continue
 			}
+			foundKServe := false
 			for _, mv := range mva {
 
 				importKey, _ := util.BuildImportKeyAndURI(util.SanitizeName(rm.Name), util.SanitizeName(mv.Name), r.format)
@@ -709,7 +710,7 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						&mv,
 						nil,
 						nil,
-						maa[mv.Name],
+						maa[mv.GetId()],
 						replacer,
 						ewriter,
 						ebuf,
@@ -750,6 +751,10 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						}
 					}
 
+					if kserveIS == nil {
+						continue
+					}
+
 					err = r.innerStartCallBackstagePrinters(ctx,
 						kfmr,
 						&rm,
@@ -766,7 +771,22 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						klog.Errorf("innerStart error from call backstage printers %s", err.Error())
 					}
 					// break regardless since only one kubeflow infsvc can match to kserve infsvc
+					foundKServe = true
 					break
+				}
+				if !foundKServe {
+					r.innerStartCallBackstagePrinters(ctx,
+						kfmr,
+						&rm,
+						&mv,
+						nil,
+						nil,
+						maa[mv.GetId()],
+						replacer,
+						ewriter,
+						ebuf,
+						importKey,
+						lastUpdateTimeSinceEpoch)
 				}
 			}
 		}
