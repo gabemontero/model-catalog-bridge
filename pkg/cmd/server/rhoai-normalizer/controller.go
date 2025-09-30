@@ -717,8 +717,9 @@ func (r *RHOAINormalizerReconcile) innerStart(ctx context.Context, buf *bytes.Bu
 						importKey,
 						lastUpdateTimeSinceEpoch)
 					if err != nil {
-						continue
+						klog.V(4).Infof("innerStart callBackstage printers len mvISL 0 error %s", err.Error())
 					}
+					continue
 				}
 				for _, kis := range mvISL {
 					kiss, ok := kis.GetDesiredStateOk()
