@@ -156,6 +156,8 @@ func getTagsFromCustomProps(lastMod bool, props map[string]openapi.MetadataValue
 			fallthrough
 		case cpk == brdgtypes.RHOAIModelCatalogProviderKey:
 			fallthrough
+		case cpk == brdgtypes.APITypeKey:
+			fallthrough
 		case cpk == brdgtypes.RHOAIModelRegistryRegisteredFromCatalogRepositoryName:
 			v := ""
 			if cpv.MetadataStringValue != nil {
@@ -182,13 +184,9 @@ func getTagsFromCustomProps(lastMod bool, props map[string]openapi.MetadataValue
 				tags[cpk] = v
 			}
 		default:
-			// user defined that we have no special cased or filtered
-			v := ""
-			if cpv.MetadataStringValue != nil {
-				v = strings.ToLower(cpv.MetadataStringValue.StringValue)
-			}
-			if strings.HasPrefix(v, "_") {
-				continue
+			v := cpk
+			if cpv.MetadataStringValue != nil && len(cpv.MetadataStringValue.StringValue) > 0 {
+				v = v + "-" + strings.ToLower(cpv.MetadataStringValue.StringValue)
 			}
 			if len(v) > 0 && regex.MatchString(v) && len(v) <= 63 {
 				tags[cpk] = v
@@ -542,10 +540,10 @@ func (m *ModelServerPopulator) GetAPI() *golang.API {
 		Type: m.ApiPop.GetType(),
 		URL:  routeExternalURL,
 	}
-    api.Annotations = map[string]string{}
-    if len(svcInternalURL) > 0 {
-         api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
-    }
+	api.Annotations = map[string]string{}
+	if len(svcInternalURL) > 0 {
+		api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
+	}
 	if routeExternalURL != svcInternalURL && len(routeExternalURL) > 0 {
 		// model exposed via route
 		api.Annotations[backstage.EXTERNAL_ROUTE_URL] = routeExternalURL
