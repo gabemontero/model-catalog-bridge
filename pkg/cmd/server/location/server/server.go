@@ -30,6 +30,7 @@ type ImportLocationServer struct {
 type modelCardMetadata struct {
 	content                  string
 	lastUpdateTimeSinceEpoch string
+	updateCount              int
 	needToUpdate             bool
 }
 
@@ -230,11 +231,13 @@ func (u *ImportLocationServer) handleCatalogUpsertPost(c *gin.Context) {
 			content:                  postBody.ModelCard,
 			lastUpdateTimeSinceEpoch: postBody.LastUpdateTimeSinceEpoch,
 			needToUpdate:             true,
+			updateCount:              0,
 		}
 	} else {
 		if mcm.lastUpdateTimeSinceEpoch != postBody.LastUpdateTimeSinceEpoch {
 			mcm.lastUpdateTimeSinceEpoch = postBody.LastUpdateTimeSinceEpoch
 			mcm.needToUpdate = true
+			mcm.updateCount = 0
 		}
 	}
 	u.modelcards[postBody.ModelCardKey] = mcm
@@ -275,15 +278,19 @@ func (i *ImportLocationServer) handleModelCardGet(c *gin.Context) {
 	key := c.Query(util.KeyQueryParam)
 	content, ok := i.modelcards[key]
 	if !ok {
+		klog.Infof("no model card found for %s", key)
 		c.Status(http.StatusNotFound)
 		return
 	}
-	if !content.needToUpdate {
+	if !content.needToUpdate && content.updateCount > 10{
+	   klog.Infof("no update required for model card %s", key)
 		c.Status(http.StatusNotModified)
 		return
 	}
-    content.needToUpdate = false
-    i.modelcards[key] = content
+	klog.Infof("return model card content for %s", key)
+	content.needToUpdate = false
+    content.updateCount++
+	i.modelcards[key] = content
 	c.Data(http.StatusOK, "Content-Type: text/markdown", []byte(content.content))
 
 }
