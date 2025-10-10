@@ -92,10 +92,6 @@ spec:
                 image: quay.io/redhat-ai-dev/model-catalog-storage-rest:latest
                 imagePullPolicy: Always
                 name: storage-rest
-                ports:
-                  - containerPort: 9090
-                    name: location
-                    protocol: TCP
                 volumeMounts:
                   - mountPath: /opt/app-root/src/dynamic-plugins-root
                     name: dynamic-plugins-root
@@ -119,10 +115,6 @@ spec:
                 image: quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer:latest
                 imagePullPolicy: Always
                 name: rhoai-normalizer
-                ports:
-                  - containerPort: 9090
-                    name: location
-                    protocol: TCP
                 volumeMounts:
                   - mountPath: /opt/app-root/src/dynamic-plugins-root
                     name: dynamic-plugins-root
