@@ -5,9 +5,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"testing"
+
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	fakeservingv1beta1 "github.com/kserve/kserve/pkg/client/clientset/versioned/fake"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
@@ -16,7 +19,6 @@ import (
 	"knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
 )
 
 func setupConfig(cfg *config.Config, obj serverapiv1beta1.InferenceService) {
@@ -66,6 +68,9 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						Spec: "TBD",
 						Type: "openapi",
 						URL:  "https://kserve.com",
+                        Annotations: map[string]string{
+                             backstage.EXTERNAL_ROUTE_URL: "https://kserve.com",
+                        },
 					},
 					Authentication: &falseVal,
 					Description:    "",
@@ -198,6 +203,9 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						Spec: types.APISpecKey,
 						Type: golang.Openapi,
 						URL:  "https://kserve.com",
+                        Annotations: map[string]string{
+                             backstage.EXTERNAL_ROUTE_URL: "https://kserve.com/",
+                        },
 					},
 					Authentication: &falseVal,
 					Description:    types.DescriptionKey,
@@ -295,6 +303,30 @@ func TestKserveBackstagePrinters(t *testing.T) {
 				if tm.Usage != nil {
 					common.AssertEqual(t, *tm.Usage, *om.Usage)
 				}
+
+				tmAPI := tm.API
+				omAPI := outMc.ModelServer.API
+				tmAPISet := tmAPI == nil
+				omAPISet := outMc.ModelServer.API == nil
+				if tmAPISet != omAPISet {
+					t.Logf("api set mismatch %s tm %v om %v", tc.name, tmAPISet, omAPISet)
+					common.AssertEqual(t, tmAPISet, omAPISet)
+				}
+				if tmAPI != nil {
+					tmAnno := tmAPI.Annotations == nil
+					omAnno := omAPI == nil
+					if tmAnno != omAnno {
+						t.Logf("api annontation mismatch %s tm %v om %v", tc.name, tmAnno, omAnno)
+						common.AssertEqual(t, tmAnno, omAnno)
+					}
+					if tmAPI.Annotations != nil {
+						if len(tmAPI.Annotations) != len(tmAPI.Annotations) {
+							t.Logf("api num of annotations mismatch %s tm %d om %d", tc.name, len(tmAPI.Annotations), len(omAPI.Annotations))
+                            common.AssertEqual(t, len(tmAPI.Annotations), len(omAPI.Annotations))
+						}
+					}
+				}
+
 			}
 		}
 

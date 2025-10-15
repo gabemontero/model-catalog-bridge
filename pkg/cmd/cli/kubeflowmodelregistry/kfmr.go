@@ -266,7 +266,10 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 		License:             mPop.GetLicense(),
 	}
 
-	model.Annotations = make(map[string]string)
+	if model.Annotations == nil {
+		model.Annotations = make(map[string]string)
+	}
+	model.Annotations[backstage.MODEL_NAME] = model.Name
 	techDocsUrl := mPop.GetTechDocs()
 	if techDocsUrl != nil && *techDocsUrl != "" {
 		model.Annotations[brdgtypes.TechDocsKey] = *techDocsUrl
@@ -308,7 +311,7 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		return nil
 	}
 
-	return &golang.ModelServer{
+	ms := &golang.ModelServer{
 		API:            m.MSPop.GetAPI(),
 		Authentication: m.MSPop.GetAuthentication(),
 		Description:    m.MSPop.GetDescription(),
@@ -319,6 +322,10 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		Tags:           m.MSPop.GetTags(),
 		Usage:          m.MSPop.GetUsage(),
 	}
+	if ms.Annotations == nil {
+		ms.Annotations = make(map[string]string)
+	}
+	return ms
 }
 
 type ModelPopulator struct {
@@ -540,7 +547,9 @@ func (m *ModelServerPopulator) GetAPI() *golang.API {
 		Type: m.ApiPop.GetType(),
 		URL:  routeExternalURL,
 	}
-	api.Annotations = map[string]string{}
+	if api.Annotations == nil {
+		api.Annotations = map[string]string{}
+	}
 	if len(svcInternalURL) > 0 {
 		api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
 	}
