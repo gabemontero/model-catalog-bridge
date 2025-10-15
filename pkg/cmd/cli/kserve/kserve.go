@@ -1,24 +1,25 @@
 package kserve
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
-	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
-	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
-	"io"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog/v2"
-	"net/url"
-	"os"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
+     "bytes"
+     "context"
+     "encoding/json"
+     "fmt"
+     "io"
+     "net/url"
+     "os"
+     "strings"
+
+     serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+     brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+     "github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
+     corev1 "k8s.io/api/core/v1"
+     "k8s.io/apimachinery/pkg/util/intstr"
+     "k8s.io/klog/v2"
+     "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -398,11 +399,21 @@ func (m *ModelServerPopulator) GetTags() []string {
 
 func (m *ModelServerPopulator) GetAPI() *golang.API {
 	m.ApiPop.Ctx = m.Ctx
+	routeExternalURL, svcInternalURL := m.ApiPop.GetURL()
 	api := &golang.API{
 		Spec: m.ApiPop.GetSpec(),
 		Tags: m.ApiPop.GetTags(),
 		Type: m.ApiPop.GetType(),
-		URL:  m.ApiPop.GetURL(),
+		URL:  routeExternalURL,
+	}
+    if api.Annotations == nil {
+         api.Annotations = map[string]string{}
+    }
+	if len(svcInternalURL) > 0 {
+		api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
+	}
+	if routeExternalURL != svcInternalURL && len(routeExternalURL) > 0 {
+		api.Annotations[backstage.EXTERNAL_ROUTE_URL] = routeExternalURL
 	}
 	return api
 }
@@ -474,55 +485,53 @@ func (m *ModelServerAPIPopulator) GetType() golang.Type {
 	return golang.Openapi
 }
 
-func (m *ModelServerAPIPopulator) GetURL() string {
+func (m *ModelServerAPIPopulator) getFullSvcURL() string {
+	listOptions := &client.ListOptions{Namespace: m.InferSvc.Namespace}
+	svcList := &corev1.ServiceList{}
+	err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
+	if err != nil {
+		return ""
+	}
+	for _, svc := range svcList.Items {
+		if svc.OwnerReferences == nil {
+			continue
+		}
+		for _, o := range svc.OwnerReferences {
+			if o.Kind == "InferenceService" &&
+				o.Name == m.InferSvc.Name &&
+				strings.HasSuffix(svc.Name, "-predictor") {
+				var port int32
+				port = 0
+				for _, sp := range svc.Spec.Ports {
+					port = sp.Port
+					if sp.TargetPort.Type == intstr.Int {
+						port = sp.TargetPort.IntVal
+					}
+					break
+				}
+				portStr := ""
+				if port != 0 && port != 80 {
+					portStr = fmt.Sprintf(":%d", port)
+				}
+				return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
+			}
+		}
+	}
+	return ""
+
+}
+
+func (m *ModelServerAPIPopulator) GetURL() (string, string) {
 	if m.InferSvc.Status.URL != nil && m.InferSvc.Status.URL.URL() != nil {
 		// return the KServe InferenceService Route or Service URL
 		kisUrl := m.InferSvc.Status.URL.URL().String()
 		if strings.Contains(kisUrl, "svc.cluster.local") {
-			// only the service was exposed
-
-			// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-			// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-			// the port correctly; so we will find the corresponding service and add the port
-			listOptions := &client.ListOptions{Namespace: m.InferSvc.Namespace}
-			svcList := &corev1.ServiceList{}
-			err := m.CtrlClient.List(m.Ctx, svcList, listOptions)
-			if err != nil {
-				return ""
-			}
-			for _, svc := range svcList.Items {
-				if svc.OwnerReferences == nil {
-					continue
-				}
-				for _, o := range svc.OwnerReferences {
-					if o.Kind == "InferenceService" &&
-						o.Name == m.InferSvc.Name &&
-						strings.HasSuffix(svc.Name, "-predictor") {
-						// prior testing with chatbot confirmed we needed to add the target port to the service URL if the port is 80
-						// and the target port is 8080; otherwise, if the port itself is 8080, the odh/rhoai consoles seem the append
-						// the port correctly
-						var port int32
-						port = 0
-						for _, sp := range svc.Spec.Ports {
-							port = sp.Port
-							if sp.TargetPort.Type == intstr.Int {
-								port = sp.TargetPort.IntVal
-							}
-							break
-						}
-						portStr := ""
-						if port != 0 && port != 80 {
-							portStr = fmt.Sprintf(":%d", port)
-						}
-						return fmt.Sprintf("http://%s.%s.svc.cluster.local%s", svc.Name, svc.Namespace, portStr)
-					}
-				}
-			}
-
+			svcURL := m.getFullSvcURL()
+			return svcURL, svcURL
 		}
-		return m.InferSvc.Status.URL.URL().String()
+		return m.InferSvc.Status.URL.URL().String(), m.getFullSvcURL()
 	}
-	return ""
+	return "", ""
 }
 
 type ModelPopulator struct {
@@ -656,6 +665,8 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 	}
 
 	model.Annotations = make(map[string]string)
+    // avoid namespace prefix
+    model.Annotations[backstage.MODEL_NAME] = m.InferSvc.Name
 	techDocsUrl := mPop.GetTechDocs()
 	if techDocsUrl != nil && *techDocsUrl != "" {
 		model.Annotations[brdgtypes.TechDocsKey] = *techDocsUrl
@@ -669,7 +680,7 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 
 	m.MSPop.InferSvc = m.InferSvc
 
-	return &golang.ModelServer{
+	ms := &golang.ModelServer{
 		API:            m.MSPop.GetAPI(),
 		Authentication: m.MSPop.GetAuthentication(),
 		Description:    m.MSPop.GetDescription(),
@@ -680,4 +691,8 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		Tags:           m.MSPop.GetTags(),
 		Usage:          m.MSPop.GetUsage(),
 	}
+    if ms.Annotations == nil {
+         ms.Annotations = map[string]string{}
+    }
+    return ms
 }
