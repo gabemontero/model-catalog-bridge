@@ -56,7 +56,7 @@ spec:
                 envFrom:
                   - secretRef:
                       name: rhdh-rhoai-bridge-token
-                image: quay.io/redhat-ai-dev/model-catalog-location-service:latest
+                image: quay.io/redhat-ai-dev/model-catalog-location-service@sha256:4f6ab6624a29f627f9f861cfcd5d18177d46aa2c67a81a75a1502c49bc2ff012
                 imagePullPolicy: Always
                 name: location
                 ports:
@@ -85,7 +85,7 @@ spec:
                 envFrom:
                   - secretRef:
                       name: rhdh-rhoai-bridge-token
-                image: quay.io/redhat-ai-dev/model-catalog-storage-rest:latest
+                image: quay.io/redhat-ai-dev/model-catalog-storage-rest@sha256:398095e7469e86d84b1196371286363f4b7668aa3e26370b4d78cb8d4ace1dc9
                 imagePullPolicy: Always
                 name: storage-rest
                 volumeMounts:
@@ -106,7 +106,7 @@ spec:
                 envFrom:
                   - secretRef:
                       name: rhdh-rhoai-bridge-token
-                image: quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer:latest
+                image: quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer@sha256:fe6c05d57495d6217c4d584940ec552c3727847ff60f39f5d04f94be024576d8
                 imagePullPolicy: Always
                 name: rhoai-normalizer
                 volumeMounts:
