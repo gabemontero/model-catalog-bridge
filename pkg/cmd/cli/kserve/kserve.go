@@ -1,25 +1,25 @@
 package kserve
 
 import (
-     "bytes"
-     "context"
-     "encoding/json"
-     "fmt"
-     "io"
-     "net/url"
-     "os"
-     "strings"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"strings"
 
-     serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
-     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
-     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
-     brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
-     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
-     "github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
-     corev1 "k8s.io/api/core/v1"
-     "k8s.io/apimachinery/pkg/util/intstr"
-     "k8s.io/klog/v2"
-     "sigs.k8s.io/controller-runtime/pkg/client"
+	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	brdgtypes "github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/util"
+	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -406,9 +406,9 @@ func (m *ModelServerPopulator) GetAPI() *golang.API {
 		Type: m.ApiPop.GetType(),
 		URL:  routeExternalURL,
 	}
-    if api.Annotations == nil {
-         api.Annotations = map[string]string{}
-    }
+	if api.Annotations == nil {
+		api.Annotations = map[string]string{}
+	}
 	if len(svcInternalURL) > 0 {
 		api.Annotations[backstage.INTERNAL_SVC_URL] = svcInternalURL
 	}
@@ -665,8 +665,13 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 	}
 
 	model.Annotations = make(map[string]string)
-    // avoid namespace prefix
-    model.Annotations[backstage.MODEL_NAME] = m.InferSvc.Name
+	// avoid namespace prefix
+	modelNameAlreadySet := m.InferSvc.Annotations[backstage.MODEL_NAME]
+	modelNameAlreadySet = strings.TrimSpace(modelNameAlreadySet)
+	model.Annotations[backstage.MODEL_NAME] = modelNameAlreadySet
+	if len(modelNameAlreadySet) == 0 {
+		model.Annotations[backstage.MODEL_NAME] = m.InferSvc.Name
+	}
 	techDocsUrl := mPop.GetTechDocs()
 	if techDocsUrl != nil && *techDocsUrl != "" {
 		model.Annotations[brdgtypes.TechDocsKey] = *techDocsUrl
@@ -691,8 +696,8 @@ func (m *ModelCatalogPopulator) GetModelServer() *golang.ModelServer {
 		Tags:           m.MSPop.GetTags(),
 		Usage:          m.MSPop.GetUsage(),
 	}
-    if ms.Annotations == nil {
-         ms.Annotations = map[string]string{}
-    }
-    return ms
+	if ms.Annotations == nil {
+		ms.Annotations = map[string]string{}
+	}
+	return ms
 }

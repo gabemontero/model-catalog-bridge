@@ -9,8 +9,8 @@ import (
 
 	serverapiv1beta1 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
 	fakeservingv1beta1 "github.com/kserve/kserve/pkg/client/clientset/versioned/fake"
-     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
-     "github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/cmd/cli/backstage"
+	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/config"
 	"github.com/redhat-ai-dev/model-catalog-bridge/pkg/types"
 	"github.com/redhat-ai-dev/model-catalog-bridge/schema/types/golang"
 	"github.com/redhat-ai-dev/model-catalog-bridge/test/stub/common"
@@ -68,9 +68,9 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						Spec: "TBD",
 						Type: "openapi",
 						URL:  "https://kserve.com",
-                        Annotations: map[string]string{
-                             backstage.EXTERNAL_ROUTE_URL: "https://kserve.com",
-                        },
+						Annotations: map[string]string{
+							backstage.EXTERNAL_ROUTE_URL: "https://kserve.com",
+						},
 					},
 					Authentication: &falseVal,
 					Description:    "",
@@ -102,6 +102,7 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						types.AnnotationPrefix + fixKeyForAnnotation(types.TechDocsKey):    types.TechDocsKey,
 						types.AnnotationPrefix + fixKeyForAnnotation(types.LicenseKey):     types.LicenseKey,
 						types.AnnotationPrefix + fixKeyForAnnotation(types.DescriptionKey): types.DescriptionKey,
+						backstage.MODEL_NAME: "foo-foo",
 					},
 				},
 				Spec: serverapiv1beta1.InferenceServiceSpec{
@@ -196,6 +197,9 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						Support:     &support,
 						Training:    &training,
 						Usage:       &usage,
+						Annotations: map[string]string{
+							backstage.MODEL_NAME: "foo-foo",
+						},
 					},
 				},
 				ModelServer: &golang.ModelServer{
@@ -203,9 +207,9 @@ func TestKserveBackstagePrinters(t *testing.T) {
 						Spec: types.APISpecKey,
 						Type: golang.Openapi,
 						URL:  "https://kserve.com",
-                        Annotations: map[string]string{
-                             backstage.EXTERNAL_ROUTE_URL: "https://kserve.com/",
-                        },
+						Annotations: map[string]string{
+							backstage.EXTERNAL_ROUTE_URL: "https://kserve.com/",
+						},
 					},
 					Authentication: &falseVal,
 					Description:    types.DescriptionKey,
@@ -322,7 +326,7 @@ func TestKserveBackstagePrinters(t *testing.T) {
 					if tmAPI.Annotations != nil {
 						if len(tmAPI.Annotations) != len(tmAPI.Annotations) {
 							t.Logf("api num of annotations mismatch %s tm %d om %d", tc.name, len(tmAPI.Annotations), len(omAPI.Annotations))
-                            common.AssertEqual(t, len(tmAPI.Annotations), len(omAPI.Annotations))
+							common.AssertEqual(t, len(tmAPI.Annotations), len(omAPI.Annotations))
 						}
 					}
 				}

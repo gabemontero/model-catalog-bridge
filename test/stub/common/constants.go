@@ -1823,6 +1823,11 @@ const (
                       "metadataType":"MetadataStringValue",
                       "string_value":"https://mymodel.io/welcome"
                   },
+                  "rhdh.modelcatalog.io/model-name":
+                  {
+                      "metadataType":"MetadataStringValue",
+                      "string_value":"foo-foo"
+                  },
                   "API Spec":
                   {
                       "metadataType":"MetadataStringValue",
