@@ -60,6 +60,10 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 							Training:    &training,
 							License:     &license,
 							Usage:       &usage,
+							Annotations: map[string]string{
+								backstage.MODEL_NAME: "mnist-v1",
+								types.TechDocsKey:    "https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs",
+							},
 						},
 					},
 				},
@@ -76,6 +80,9 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
 							Training:    &training,
 							Usage:       &usage,
+							Annotations: map[string]string{
+								backstage.MODEL_NAME: "foo-foo",
+							},
 						},
 					},
 				},
@@ -98,6 +105,10 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 							Training:    &training,
 							License:     &license,
 							Usage:       &usage,
+							Annotations: map[string]string{
+								backstage.MODEL_NAME: "mnist-v1",
+								types.TechDocsKey:    "https://github.com/redhat-ai-dev/granite-3.1-8b-lab-docs",
+							},
 						},
 					},
 					ModelServer: &golang.ModelServer{
@@ -131,6 +142,9 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 							Tags:        []string{"rhoai", "rhoai-model-registry", "matteos-lightweight-test-model", "v3", "grpc", "last-modified-time-2025-02-25-19-45-29-959"},
 							Training:    &training,
 							Usage:       &usage,
+							Annotations: map[string]string{
+								backstage.MODEL_NAME: "foo-foo",
+							},
 						},
 					},
 				},
@@ -326,9 +340,18 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 								continue
 							}
 						}
+						tcAnnotations := tcModel.Annotations == nil
+						outAnnotations := outModel.Annotations == nil
+						if tcAnnotations != outAnnotations {
+							t.Logf("annotations nil mismatch oidx %d", oidx)
+						}
 						if tcModel.Annotations != nil {
 							if tcModel.Annotations[types.TechDocsKey] != outModel.Annotations[types.TechDocsKey] {
-								t.Logf("annotation mismatch oidx %d", oidx)
+								t.Logf("annotation tech docs key mismatch oidx %d", oidx)
+								continue
+							}
+							if tcModel.Annotations[backstage.MODEL_NAME] != outModel.Annotations[backstage.MODEL_NAME] {
+								t.Logf("annotation model name mismatch oidx %d", oidx)
 								continue
 							}
 						}
@@ -388,10 +411,10 @@ func TestLoopOverKRMR_JsonArray(t *testing.T) {
 								continue
 							}
 							if tms.API.Annotations != nil {
-                                 if len(tms.API.Annotations) != len(oms.API.Annotations) {
-                                      t.Logf("svr annotations len mismatch oidx %d", oidx)
-                                      continue
-                                 }
+								if len(tms.API.Annotations) != len(oms.API.Annotations) {
+									t.Logf("svr annotations len mismatch oidx %d", oidx)
+									continue
+								}
 							}
 							if tms.API.Spec != oms.API.Spec {
 								t.Logf("svr api spec mismatch oidx %d", oidx)

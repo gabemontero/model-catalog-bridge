@@ -269,7 +269,20 @@ func (m *ModelCatalogPopulator) GetModels() []golang.Model {
 	if model.Annotations == nil {
 		model.Annotations = make(map[string]string)
 	}
+
 	model.Annotations[backstage.MODEL_NAME] = model.Name
+	// see if there are overriddes in the custom props
+	props := mPop.RegisteredModel.GetCustomProperties()
+	modelName, ok := props[backstage.MODEL_NAME]
+	if ok && modelName.MetadataStringValue != nil {
+		model.Annotations[backstage.MODEL_NAME] = modelName.MetadataStringValue.StringValue
+	}
+	props = mPop.ModelVersion.GetCustomProperties()
+	modelName, ok = props[backstage.MODEL_NAME]
+	if ok && modelName.MetadataStringValue != nil {
+		model.Annotations[backstage.MODEL_NAME] = modelName.MetadataStringValue.StringValue
+	}
+
 	techDocsUrl := mPop.GetTechDocs()
 	if techDocsUrl != nil && *techDocsUrl != "" {
 		model.Annotations[brdgtypes.TechDocsKey] = *techDocsUrl
