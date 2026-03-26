@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,11 @@ import (
 	testgin "github.com/redhat-ai-dev/model-catalog-bridge/test/stub/gin-gonic"
 	apijson "k8s.io/apimachinery/pkg/util/json"
 )
+
+func TestMain(m *testing.M) {
+	gin.SetMode(gin.ReleaseMode)
+	os.Exit(m.Run())
+}
 
 func TestHandleCatalogDiscoveryGet(t *testing.T) {
 	for _, tc := range []struct {
@@ -409,7 +415,6 @@ func TestLoadFromStorageSuccess(t *testing.T) {
 	ts := newFakeStorageServer([]string{"mnist_v1"}, modelData, false, false)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -434,7 +439,6 @@ func TestLoadFromStorageListError(t *testing.T) {
 	ts := newFakeStorageServer(nil, nil, true, false)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -463,7 +467,6 @@ func TestLoadFromStorageListBadRC(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -498,7 +501,6 @@ func TestLoadFromStorageFetchRealError(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -517,7 +519,6 @@ func TestLoadFromStorageFetchError(t *testing.T) {
 	ts := newFakeStorageServer([]string{"mnist_v1"}, nil, false, true)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -540,7 +541,6 @@ func TestLoadFromStorageBadKey(t *testing.T) {
 	ts := newFakeStorageServer([]string{"badkey", "mnist_v1"}, modelData, false, false)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -557,7 +557,6 @@ func TestLoadFromStorageBadKey(t *testing.T) {
 }
 
 func TestRunStopsOnSignal(t *testing.T) {
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	// Use an invalid port to make router.Run fail immediately with an error,
 	// which covers the error handling path inside the goroutine
@@ -600,7 +599,6 @@ func TestLoadFromStorageEmptyKeys(t *testing.T) {
 	ts := newFakeStorageServer([]string{}, nil, false, false)
 	defer ts.Close()
 
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,
@@ -618,7 +616,6 @@ func TestLoadFromStorageEmptyKeys(t *testing.T) {
 
 func TestLoadFromStorageConnectionError(t *testing.T) {
 	// Use a URL that will cause a connection error
-	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	ils := &ImportLocationServer{
 		router:     r,

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -624,8 +626,33 @@ func Test_setupBkstg_AlreadySet(t *testing.T) {
 func Test_setupBkstg_NilBkstg(t *testing.T) {
 	s, _, _ := setupTestServer(t)
 	s.bkstg = nil
-	// This will try GetRESTConfig which will likely fail in test,
-	// so setupBkstg should return false
+	// Create a minimal kubeconfig pointing to an unreachable server so that
+	// GetK8sConfig succeeds (returns non-nil config) but GetBackstageURL
+	// fails when trying to list routes. This avoids hitting ctrl.GetConfigOrDie
+	// and avoids using the real ~/.kube/config.
+	tmpDir := t.TempDir()
+	kubeconfig := filepath.Join(tmpDir, "config")
+	kubecfgContent := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:1
+  name: fake
+contexts:
+- context:
+    cluster: fake
+    user: fake
+  name: fake
+current-context: fake
+users:
+- name: fake
+  user:
+    token: fake
+`
+	os.WriteFile(kubeconfig, []byte(kubecfgContent), 0600)
+	t.Setenv("KUBECONFIG", kubeconfig)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "")
 	result := s.setupBkstg()
 	common.AssertEqual(t, false, result)
 }
